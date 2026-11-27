@@ -318,6 +318,15 @@ class BeurerBleCard extends HTMLElement {
       label.textContent = fmt(t);
       root.append(label);
     }
+    if (metric.bp && series.length === 2) {
+      // Blood pressure: fill the band between systolic (top) and diastolic (bottom).
+      const top = series[0].pts.filter((p) => p.t >= t0);
+      const bottom = series[1].pts.filter((p) => p.t >= t0);
+      if (top.length && bottom.length) {
+        const outline = [...top, ...[...bottom].reverse()].map((p) => `${x(p.t)},${y(p.v)}`).join(" ");
+        root.append(svg("polygon", { points: outline, class: "band" }));
+      }
+    }
     for (const s of series) {
       const pts = s.pts.filter((p) => p.t >= t0);
       if (pts.length > 1) {
@@ -439,6 +448,7 @@ const STYLE = `
   .plot svg { width: 100%; height: auto; display: block; }
   .plot .grid { stroke: var(--divider-color); stroke-width: 1; }
   .plot .axis { fill: var(--secondary-text-color); font-size: 11px; }
+  .plot .band { fill: var(--primary-color); fill-opacity: 0.18; stroke: none; }
   .plot .line { fill: none; stroke-width: 2.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 `;
 

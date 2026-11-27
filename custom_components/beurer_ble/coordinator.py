@@ -216,8 +216,8 @@ class BeurerCoordinator:
             session.on_data = lambda: self.hass.async_create_task(
                 self._async_process(*self._from_sanitas(session))
             )
-        elif isinstance(session, BPMSession):
-            session.on_data = lambda: self.hass.async_create_task(self._async_process_bpm(session))
+        # Blood pressure monitors resend every stored reading: process them once at the
+        # end, so each sensor changes only to the newest reading (one point in history).
         try:
             await session.run(LISTEN_TIME)
         except (BleakError, TimeoutError, ScaleDisconnected) as err:
