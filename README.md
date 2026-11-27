@@ -58,6 +58,19 @@ Sensoren entstehen pro Person (Benutzer auf der Waage bzw. Speicher am Blutdruck
 
 Jede neue Messung löst außerdem das Ereignis `beurer_ble_measurement` mit allen Werten und der zugeordneten `ha_person` aus. Das eignet sich für Automationen oder um mehrere auf einmal übertragene Messungen zu protokollieren, z. B. den Blutdruckverlauf.
 
+## Dashboard-Karte
+
+Die Integration bringt eine eigene Karte mit: *Dashboard bearbeiten → Karte hinzufügen → „Beurer BLE“* und die Person auswählen. In YAML:
+
+```yaml
+type: custom:beurer-ble-card
+person: person.christoph   # optional, sonst die erste zugeordnete Person
+days: 90                   # Verlauf: 30, 90 oder 365 Tage
+```
+
+- **Kacheln** mit den aktuellen Werten: Gewicht (mit Änderung zur letzten Wiegung), Körperfett, Wasser, Muskeln, Knochen, BMI, Grund- und Gesamtumsatz, Blutdruck und Puls. Es erscheint nur, was es für die Person gibt.
+- **Verlauf:** Eine Kachel antippen zeigt ihren Verlauf (beim Blutdruck systolisch und diastolisch). Oben lässt sich der Zeitraum umschalten. Doppelt antippen öffnet den Detail-Dialog.
+
 ## Messwerte Personen in Home Assistant zuordnen
 
 Unter *Einstellungen → Geräte & Dienste → Beurer BLE → Konfigurieren* erscheint jede Person, die auf dem Gerät gefunden wurde, z. B. `COD [101]` oder `Benutzer 1 [1]`. Jeder lässt sich eine HA-Person (`person.…`) zuordnen.
@@ -166,6 +179,19 @@ Sensors are created per person (scale user or monitor memory) as soon as that pe
 - **Every device:** a battery sensor (diagnostic).
 
 Every new measurement also fires the event `beurer_ble_measurement` with all its values and the mapped `ha_person`. Use it in automations, or to log readings that arrive several at a time, for example blood pressure history.
+
+## Dashboard card
+
+The integration ships its own card: *Edit dashboard → Add card → "Beurer BLE"* and pick the person. In YAML:
+
+```yaml
+type: custom:beurer-ble-card
+person: person.john   # optional, defaults to the first mapped person
+days: 90              # history: 30, 90 or 365 days
+```
+
+- **Tiles** with the latest values: weight (with the change since the last weighing), body fat, water, muscle, bone, BMI, BMR, AMR, blood pressure and pulse. Only what exists for the person is shown.
+- **History:** tap a tile to chart it (systolic and diastolic for blood pressure). Switch the range at the top. Double-tap opens the more-info dialog.
 
 ## Assigning measurements to Home Assistant persons
 

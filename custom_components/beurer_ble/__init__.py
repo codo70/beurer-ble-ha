@@ -14,6 +14,7 @@ import voluptuous as vol
 from .const import CONF_FAMILY, CONF_MODEL, DOMAIN
 from .coordinator import BeurerCoordinator
 from .devices import FAMILY_SANITAS, DeviceModel, identify
+from .frontend import async_setup_frontend
 from .sanitas_protocol import NewUser
 
 PLATFORMS = [Platform.SENSOR]
@@ -65,6 +66,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: BeurerConfigEntry) -> bool:
     """Set up a device from a config entry."""
+    await async_setup_frontend(hass)
     name = entry.data.get(CONF_NAME, "Beurer")
     model = identify(name) or DeviceModel(
         entry.data.get(CONF_FAMILY, "bpm"), entry.data.get(CONF_MODEL, name)
