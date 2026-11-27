@@ -104,6 +104,8 @@ class BPMSession(BaseSession):
             self._seq += 1
             ts = int(time.time()) - 1000 + self._seq
         self.add_measurement(pid, {"timestamp": ts, **values})
+        if self.on_data is not None:
+            self.on_data()
 
     async def run(self, listen_time: float) -> None:
         """Run the sync."""

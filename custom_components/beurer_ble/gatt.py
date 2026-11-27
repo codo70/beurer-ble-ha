@@ -103,6 +103,8 @@ class BaseSession:
         self.measurements: dict[str, list[dict]] = {}
         self.battery: int | None = None
         self.connected_ok = False
+        # Called (without arguments) whenever a finished measurement was received.
+        self.on_data = None
 
     def on_disconnect(self) -> None:
         """Wake up a waiting reader when the device disconnects."""

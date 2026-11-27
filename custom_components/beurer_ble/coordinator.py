@@ -184,6 +184,15 @@ class BeurerCoordinator:
             _LOGGER.debug("%s: connect failed: %s", self.address, err)
             return
         session = self._make_session(client)
+        # Show each measurement right away instead of after the whole sync.
+        if isinstance(session, SanitasSession):
+            session.on_data = lambda: self.hass.async_create_task(
+                self._async_process(*self._from_sanitas(session))
+            )
+        elif isinstance(session, BPMSession):
+            session.on_data = lambda: self.hass.async_create_task(
+                self._async_process(session.persons, session.measurements, session.battery, True)
+            )
         try:
             await session.run(LISTEN_TIME)
         except (BleakError, TimeoutError, ScaleDisconnected) as err:

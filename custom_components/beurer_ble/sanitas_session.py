@@ -71,6 +71,8 @@ class SanitasSession:
         self.live_weight: float | None = None
         # The scale sends e.g. "e0 01" when an armed measurement request expired.
         self._request_expired = False
+        # Called (without arguments) whenever a new measurement was received.
+        self.on_data: Callable[[], None] | None = None
         self._client = client
         self._start = start_byte
         self._queue: asyncio.Queue[bytes | None] = asyncio.Queue()
@@ -138,6 +140,8 @@ class SanitasSession:
         lst = self.measurements.setdefault(uid, [])
         if all(m.timestamp != meas.timestamp for m in lst):
             lst.append(meas)
+            if self.on_data is not None:
+                self.on_data()
 
     async def _dispatch(self, data: bytes) -> None:
         """Handle a frame that is not the one currently awaited."""
