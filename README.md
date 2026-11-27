@@ -10,7 +10,7 @@ Home-Assistant-Integration für **Bluetooth-Waagen und Blutdruckmessgeräte von 
 
 Die Waagen-Protokolle folgen den nachgebauten Umsetzungen von [openScale](https://github.com/oliexdev/openScale). Blutdruckmessgeräte nutzen das Standard-Bluetooth-Profil für Blutdruck.
 
-> **Status:** Beta. Die BF700 ist mit einer echten Waage getestet: Verbindung, Benutzer anlegen und Live-Wiegungen. Die anderen Gerätefamilien sind bisher nur gegen nachgebaute Geräte getestet.
+> **Status:** Version 1.0. Mit echten Geräten getestet: **Beurer BF700** (Benutzer anlegen, Referenzmessung, Körperanalyse) und **Beurer BM 85** (zwei Benutzer, gespeicherte Messungen). Die übrigen Geräte sind nach openScale umgesetzt und nur gegen nachgebaute Geräte getestet – Rückmeldungen willkommen.
 
 ## Unterstützte Geräte
 
@@ -144,7 +144,7 @@ Home Assistant custom integration for **Beurer / Sanitas Bluetooth scales and bl
 
 The scale protocols follow the reverse-engineered implementations in [openScale](https://github.com/oliexdev/openScale). Blood pressure monitors use the standard Bluetooth Blood Pressure profile.
 
-> **Status:** Beta. The BF700 has been tested with a real scale: connection, creating a user and live weighings. The other device families are tested against simulated devices only.
+> **Status:** Version 1.0. Tested with real devices: **Beurer BF700** (creating users, reference measurement, body analysis) and **Beurer BM 85** (two users, stored readings). The other devices follow openScale and are tested against simulated devices only – feedback welcome.
 
 ## Supported devices
 
