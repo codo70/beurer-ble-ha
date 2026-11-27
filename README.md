@@ -83,6 +83,8 @@ Unter *Einstellungen → Geräte & Dienste → Beurer BLE → Konfigurieren* ers
 - Bei einer geänderten Zuordnung legt die Integration neue Entitäten an und entfernt die alten. Deren Verlauf bleibt in der Datenbank, hängt aber nicht mehr an der Person.
 - Der Batteriestand bleibt beim Gerät selbst.
 
+**Nicht zugeordnet = Gast:** Jede Person auf einem Gerät, die keiner HA-Person zugeordnet ist (z. B. Benutzer 2 am Blutdruckgerät oder ein weiterer Benutzer auf der Waage), erscheint als **Gast**. Die Zuordnung lässt sich jederzeit nachholen.
+
 **Gast-Wiegungen nach Gewicht zuordnen** (Waagen, standardmäßig an): Erkennt die Waage niemanden und meldet einen Gast, bekommt die Wiegung die Person, deren letztes Gewicht höchstens 3 kg abweicht. Der nächste Kandidat muss mindestens 2 kg weiter weg liegen, sonst bleibt es eine Gast-Wiegung.
 
 Wer gemessen hat, entscheidet weiterhin das Gerät. Home Assistant übersetzt nur dessen Benutzer in eine HA-Person. Wer am Blutdruckgerät den falschen Speicher wählt, landet also auch in HA bei der falschen Person.
@@ -207,6 +209,8 @@ Under *Settings → Devices & services → Beurer BLE → Configure* every perso
 - Each HA person gets a device of their own, named after the person, for example "Christoph". The scale and the blood pressure monitor both put their sensors there, such as `sensor.christoph_gewicht` and `sensor.christoph_blutdruck_systolisch`.
 - When you change a mapping, the integration creates new entities and removes the old ones. The old ones' history stays in the recorder but is no longer linked.
 - The battery sensor stays on the physical device.
+
+**Unassigned = guest:** every person on a device without an HA person (e.g. user 2 on the monitor, another scale user) is shown as the **guest**. You can map them later at any time.
 
 **Assigning guest weighings by weight** (scales, on by default): the scale may not recognise a user and report a guest. The integration then gives the weighing to the person whose last weight is within 3 kg. The next candidate must be at least 2 kg further away, otherwise the weighing stays a guest weighing.
 

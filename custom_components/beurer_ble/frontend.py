@@ -62,7 +62,7 @@ def ws_persons(hass: HomeAssistant, connection: websocket_api.ActiveConnection, 
                     continue
                 ha_person = coordinator.ha_person(pid)
                 # Mapped persons share one device across scale and monitor.
-                group = ha_person or f"{entry.entry_id}:{pid}"
+                group = ha_person or ("guest" if pid == "guest" else f"{entry.entry_id}:{pid}")
                 person = persons.get(group)
                 if person is None:
                     name = coordinator.persons.get(pid, pid)

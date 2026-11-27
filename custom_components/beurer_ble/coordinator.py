@@ -85,6 +85,8 @@ class BeurerCoordinator:
         # Blood pressure monitors resend all stored readings every time and their
         # clock may be wrong: remember readings already seen (by content).
         self._seen: dict[str, None] = {}
+        # Scale users that already had a body analysis (no reference measurement needed).
+        self._analysed: set[str] = set()
         self.auto_assign: bool = entry.options.get(CONF_AUTO_ASSIGN, True)
 
     def ha_person(self, pid: str) -> str | None:
@@ -97,8 +99,18 @@ class BeurerCoordinator:
             return state.name
         return person.split(".", 1)[-1].replace("_", " ").title()
 
+    def effective_pid(self, pid: str) -> str:
+        """Device persons without an HA person are shown together as the guest."""
+        return pid if pid == "guest" or self.ha_person(pid) else "guest"
+
     def _assign_guests(self, measurements: dict[str, list[dict]]) -> dict[str, list[dict]]:
-        """Move guest weighings to the person with the matching weight."""
+        """Unmapped persons become the guest; guest weighings may go to a person by weight."""
+        merged: dict[str, list[dict]] = {}
+        for pid, lst in measurements.items():
+            merged.setdefault(self.effective_pid(pid), []).extend(lst)
+        measurements = merged
+        if "guest" in measurements:
+            self.persons.setdefault("guest", "Gast")
         if not self.auto_assign:
             return measurements
         candidates = {
@@ -126,6 +138,17 @@ class BeurerCoordinator:
             self._start_byte = data.get("start_byte", self._start_byte)
             self.needs_reference = set(data.get("needs_reference", []))
             self._seen = dict.fromkeys(data.get("seen", []))
+            self._analysed = set(data.get("analysed", [])) | {
+                pid for pid, m in self.latest.items() if m.get("fat_pct")
+            }
+            # Values of persons that are not mapped (any more) belong to the guest.
+            for pid in [p for p in self.latest if self.effective_pid(p) != p]:
+                meas = self.latest.pop(pid)
+                guest = self.latest.get("guest")
+                if guest is None or meas.get("timestamp", 0) > guest.get("timestamp", 0):
+                    self.latest["guest"] = meas
+            if "guest" in self.latest:
+                self.persons.setdefault("guest", "Gast")
         self._unsub = bluetooth.async_register_callback(
             self.hass,
             self._async_on_advertisement,
@@ -162,7 +185,7 @@ class BeurerCoordinator:
             refs = set(self.needs_reference) | {
                 int(pid)
                 for pid in self.persons
-                if pid.isdigit() and int(pid) > 0 and not self.latest.get(pid, {}).get("fat_pct")
+                if pid.isdigit() and int(pid) > 0 and pid not in self._analysed
             }
             return SanitasSession(client, self._start_byte, self.pending_user, refs)
         if self.model.family == FAMILY_STANDARD:
@@ -215,6 +238,7 @@ class BeurerCoordinator:
                 if any(m.fat_pct for m in lst)
             }
             self.needs_reference -= done
+            self._analysed |= {str(uid) for uid in done}
             await self._async_process(*self._from_sanitas(session))
             await self._async_finish_user_creation(session)
             await self._async_save()
@@ -315,13 +339,16 @@ class BeurerCoordinator:
             if pid not in self.persons:
                 self.persons[pid] = label
                 changed = True
-        for pid, lst in session.measurements.items():
+        for dev_pid, lst in session.measurements.items():
+            pid = self.effective_pid(dev_pid)
+            if pid == "guest":
+                self.persons.setdefault("guest", "Gast")
             newest = None
             for raw in lst:
                 key = "|".join(
                     str(raw.get(k)) for k in ("device_ts", "systolic", "diastolic", "pulse")
                 )
-                key = f"{pid}|{key}"
+                key = f"{dev_pid}|{key}"
                 if key in self._seen:
                     continue
                 self._seen[key] = None
@@ -334,9 +361,9 @@ class BeurerCoordinator:
                     EVENT_MEASUREMENT,
                     {
                         "address": self.address,
-                        "person": pid,
-                        "person_name": self.persons.get(pid, pid),
-                        "ha_person": self.ha_person(pid),
+                        "person": dev_pid,
+                        "person_name": self.persons.get(dev_pid, dev_pid),
+                        "ha_person": self.ha_person(dev_pid),
                         **meas,
                     },
                 )
@@ -364,5 +391,6 @@ class BeurerCoordinator:
                 "start_byte": self._start_byte,
                 "needs_reference": sorted(self.needs_reference),
                 "seen": list(self._seen),
+                "analysed": sorted(self._analysed),
             }
         )

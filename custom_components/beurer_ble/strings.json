@@ -22,7 +22,7 @@
     "step": {
       "init": {
         "title": "Assign persons",
-        "description": "Persons on the device: {persons}. Pick the matching Home Assistant person for each. Mapped values go to one device per person (e.g. sensor.john_weight). Persons appear here after the first measurement.\n\nConsent codes (standard-profile scales only) as slot:code, e.g. 1:1234, 2:5678.",
+        "description": "Persons on the device: {persons}. Pick the matching Home Assistant person for each. Mapped values go to one device per person (e.g. sensor.john_weight). Unassigned persons are shown as \"Guest\". Persons appear here after the first measurement.\n\nConsent codes (standard-profile scales only) as slot:code, e.g. 1:1234, 2:5678.",
         "data": {
           "auto_assign": "Assign guest weighings by weight",
           "consent_codes": "Consent codes"

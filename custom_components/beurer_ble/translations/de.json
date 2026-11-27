@@ -22,7 +22,7 @@
     "step": {
       "init": {
         "title": "Personen zuordnen",
-        "description": "Personen auf dem Gerät: {persons}. Wähle für jede die passende Person aus Home Assistant. Zugeordnete Werte landen in einem eigenen Gerät pro Person (z. B. sensor.christoph_gewicht). Personen erscheinen hier erst nach der ersten Messung.\n\nFreigabecodes (nur Standard-Waagen) als Platz:Code, z. B. 1:1234, 2:5678.",
+        "description": "Personen auf dem Gerät: {persons}. Wähle für jede die passende Person aus Home Assistant. Zugeordnete Werte landen in einem eigenen Gerät pro Person (z. B. sensor.christoph_gewicht). Nicht zugeordnete Personen laufen als „Gast“. Personen erscheinen hier erst nach der ersten Messung.\n\nFreigabecodes (nur Standard-Waagen) als Platz:Code, z. B. 1:1234, 2:5678.",
         "data": {
           "auto_assign": "Gast-Wiegungen nach Gewicht zuordnen",
           "consent_codes": "Freigabecodes"

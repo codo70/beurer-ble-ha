@@ -131,7 +131,7 @@ class BeurerOptionsFlow(OptionsFlow):
         persons: dict[str, str] = dict(coordinator.persons) if coordinator else {}
         current: dict[str, str] = entry.options.get(CONF_PERSONS, {})
         # Form field label -> device person id
-        fields = {f"{label} [{pid}]": pid for pid, label in sorted(persons.items())}
+        fields = {f"{label} [{pid}]": pid for pid, label in sorted(persons.items()) if pid != "guest"}
 
         if user_input is not None:
             data: dict[str, Any] = {
