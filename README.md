@@ -45,7 +45,7 @@ Sensoren entstehen pro Person (Benutzer auf der Waage bzw. Speicher am Blutdruck
 - **Waagen:**
   - Gewicht, Körperfett, Körperwasser, Muskelanteil
   - Knochenmasse, Muskelmasse, fettfreie Masse (wenn das Modell sie liefert)
-  - BMI und Grundumsatz (wenn das Modell sie liefert)
+  - BMI, Grundumsatz und Gesamtumsatz (wenn das Modell sie liefert, z. B. BF700)
   - Impedanz (Diagnose)
   - letzte Wiegung
 - **Blutdruckmessgeräte:**
@@ -154,7 +154,7 @@ Sensors are created per person (scale user or monitor memory) as soon as that pe
 - **Scales:**
   - weight, body fat, body water and muscle share
   - bone mass, muscle mass and fat-free mass (on models that report them)
-  - BMI and BMR (on models that report them)
+  - BMI, BMR and AMR (on models that report them, e.g. the BF700)
   - impedance (diagnostic)
   - last measurement
 - **Blood pressure monitors:**

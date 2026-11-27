@@ -162,6 +162,9 @@ class Measurement:
     water_pct: float | None
     muscle_pct: float | None
     bone_kg: float | None
+    bmr_kcal: int | None = None
+    amr_kcal: int | None = None
+    bmi: float | None = None
 
     def as_dict(self) -> dict:
         """Serialise for storage."""
@@ -218,6 +221,10 @@ def parse_measurement(buf: bytes) -> Measurement | None:
     water = _u16(buf, 10) / 10
     muscle = _u16(buf, 12) / 10
     bone = _u16(buf, 14) * 50 / 1000
+    # BF700 (verified on a real scale): BMR kcal, AMR kcal (= BMR x activity factor), BMI x10.
+    bmr = _u16(buf, 16) if len(buf) >= 18 else 0
+    amr = _u16(buf, 18) if len(buf) >= 20 else 0
+    bmi = _u16(buf, 20) / 10 if len(buf) >= 22 else 0
     return Measurement(
         timestamp=timestamp,
         weight_kg=round(weight, 2),
@@ -226,4 +233,7 @@ def parse_measurement(buf: bytes) -> Measurement | None:
         water_pct=water or None,
         muscle_pct=muscle or None,
         bone_kg=round(bone, 2) or None,
+        bmr_kcal=bmr or None,
+        amr_kcal=amr or None,
+        bmi=bmi or None,
     )

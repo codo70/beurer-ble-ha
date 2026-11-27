@@ -57,6 +57,10 @@ SENSORS: dict[str, BeurerSensorDescription] = {
             state_class=SensorStateClass.MEASUREMENT, native_unit_of_measurement="kcal",
         ),
         BeurerSensorDescription(
+            key="amr_kcal", name="Gesamtumsatz", icon="mdi:fire",
+            state_class=SensorStateClass.MEASUREMENT, native_unit_of_measurement="kcal",
+        ),
+        BeurerSensorDescription(
             key="impedance", name="Impedanz", icon="mdi:omega",
             state_class=SensorStateClass.MEASUREMENT, native_unit_of_measurement="Ω",
             entity_category=EntityCategory.DIAGNOSTIC,

@@ -216,3 +216,11 @@ async def test_create():
     assert m.weight_kg == 80.3 and m.fat_pct == 21.9, m
     print("bf700 create user OK", m)
 asyncio.run(test_create())
+
+# ---------------------------------------------------------------- real BF700 frame (2026-11-27, user COD)
+buf = bytes.fromhex("6b098274077c01bc0111 01cc016e00f2078f0a950115".replace(" ", ""))
+m = proto.parse_measurement(buf)
+assert (m.weight_kg, m.impedance, m.fat_pct, m.water_pct, m.muscle_pct, m.bone_kg) == (95.8, 444, 27.3, 46.0, 36.6, 12.1), m
+assert (m.bmr_kcal, m.amr_kcal, m.bmi) == (1935, 2709, 27.7), m
+assert proto.Measurement.from_dict({k: v for k, v in m.as_dict().items() if k not in ("bmr_kcal", "amr_kcal", "bmi")}).bmi is None
+print("real BF700 frame OK")
