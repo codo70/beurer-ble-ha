@@ -4,11 +4,129 @@
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
 
+**Deutsch** · [English below](#english)
+
+Home-Assistant-Integration für **Bluetooth-Waagen und Blutdruckmessgeräte von Beurer und Sanitas**. Sie spricht direkt per Bluetooth mit den Geräten, über den Bluetooth-Adapter von HA oder über ESPHome-Bluetooth-Proxys. Es braucht keine Cloud, keine App und keine eigene ESP-Firmware.
+
+Die Waagen-Protokolle folgen den nachgebauten Umsetzungen von [openScale](https://github.com/oliexdev/openScale). Blutdruckmessgeräte nutzen das Standard-Bluetooth-Profil für Blutdruck.
+
+> **Status:** Beta. Die BF700 ist mit einer echten Waage getestet: Verbindung, Benutzer anlegen und Live-Wiegungen. Die anderen Gerätefamilien sind bisher nur gegen nachgebaute Geräte getestet.
+
+## Unterstützte Geräte
+
+| Familie | Geräte | Hinweis |
+|---|---|---|
+| Beurer/Sanitas-Protokoll | BF700, BF710, BF800, Runtastic Libra, Sanitas SBF70, SilverCrest SBF75, Crane | Benutzer und gespeicherte Messungen werden ohne Code gelesen. Benutzer lassen sich aus HA anlegen. |
+| Standard-Waagenprofil | BF105, BF720, BF915, BF950, BF500, BF600, BF850, BF1000 (Grundwerte), Sanitas SBF72, SBF73, SBF76, SBF77 | Gespeicherte Daten brauchen pro Person einen **Freigabecode** (siehe unten). |
+| Blutdruck | BM 85 und andere Beurer BM/BC mit Bluetooth, dazu jedes Gerät mit dem Standard-Blutdruckdienst (0x1810) | Liest alle gespeicherten Messungen. Die vertauschten Puls-Bytes des BM 85 werden berücksichtigt. |
+
+Nicht unterstützt sind die BF450 (abweichendes Datenformat) und die Segmentwerte der BF1000.
+
+## Installation
+
+- **Marketplace / HACS:** Dieses Repository als benutzerdefiniertes Repository hinzufügen (Kategorie *Integration*) und installieren.
+- **Manuell:** `custom_components/beurer_ble` nach `/config/custom_components/` kopieren.
+
+Danach Home Assistant neu starten, auf die Waage steigen bzw. eine Messung machen und das gefundene Gerät unter *Einstellungen → Geräte & Dienste* bestätigen.
+
+## So funktioniert es
+
+Sobald ein Gerät aufwacht, weil jemand auf die Waage steigt oder eine Blutdruckmessung fertig ist, sendet es per Bluetooth, und Home Assistant verbindet sich.
+
+- **Waagen:** Die Integration stellt die Uhr, liest Batterie und Benutzerliste und holt die gespeicherten Messungen. Danach bleibt sie 30 s verbunden, falls noch gewogen wird, holt noch einmal ab und trennt.
+- **Blutdruckmessgeräte:** Die Integration empfängt alle gespeicherten Messungen. Das Gerät trennt danach von selbst.
+- **Am Gerät wird nichts gelöscht.** Die Beurer-App HealthManager funktioniert weiter.
+- **Zwischen zwei Abrufen** wartet die Integration mindestens 90 s.
+
+## Entitäten
+
+Sensoren entstehen pro Person (Benutzer auf der Waage bzw. Speicher am Blutdruckgerät), sobald diese Person einen Wert hat. Sie heißen nach der Person, z. B. `COD Gewicht` oder `Benutzer 1 Blutdruck systolisch`.
+
+- **Waagen:**
+  - Gewicht, Körperfett, Körperwasser, Muskelanteil
+  - Knochenmasse, Muskelmasse, fettfreie Masse (wenn das Modell sie liefert)
+  - BMI und Grundumsatz (wenn das Modell sie liefert)
+  - Impedanz (Diagnose)
+  - letzte Wiegung
+- **Blutdruckmessgeräte:**
+  - Blutdruck systolisch und diastolisch
+  - Puls
+  - Mitteldruck (standardmäßig deaktiviert)
+  - letzte Blutdruckmessung
+  - Beim systolischen Wert stehen als Attribute zusätzlich unregelmäßiger Puls, Bewegung und Manschettensitz.
+- **Jedes Gerät:** Batteriestand (Diagnose).
+
+Jede neue Messung löst außerdem das Ereignis `beurer_ble_measurement` mit allen Werten und der zugeordneten `ha_person` aus. Das eignet sich für Automationen oder um mehrere auf einmal übertragene Messungen zu protokollieren, z. B. den Blutdruckverlauf.
+
+## Messwerte Personen in Home Assistant zuordnen
+
+Unter *Einstellungen → Geräte & Dienste → Beurer BLE → Konfigurieren* erscheint jede Person, die auf dem Gerät gefunden wurde, z. B. `COD [101]` oder `Benutzer 1 [1]`. Jeder lässt sich eine HA-Person (`person.…`) zuordnen.
+
+**Was die Zuordnung bewirkt:**
+- Jede HA-Person bekommt ein eigenes Gerät mit ihrem Namen, z. B. „Christoph“. Waage und Blutdruckgerät legen ihre Sensoren dort ab, etwa `sensor.christoph_gewicht` und `sensor.christoph_blutdruck_systolisch`.
+- Bei einer geänderten Zuordnung legt die Integration neue Entitäten an und entfernt die alten. Deren Verlauf bleibt in der Datenbank, hängt aber nicht mehr an der Person.
+- Der Batteriestand bleibt beim Gerät selbst.
+
+**Gast-Wiegungen nach Gewicht zuordnen** (Waagen, standardmäßig an): Erkennt die Waage niemanden und meldet einen Gast, bekommt die Wiegung die Person, deren letztes Gewicht höchstens 3 kg abweicht. Der nächste Kandidat muss mindestens 2 kg weiter weg liegen, sonst bleibt es eine Gast-Wiegung.
+
+Wer gemessen hat, entscheidet weiterhin das Gerät. Home Assistant übersetzt nur dessen Benutzer in eine HA-Person. Wer am Blutdruckgerät den falschen Speicher wählt, landet also auch in HA bei der falschen Person.
+
+## Benutzer auf der Waage aus Home Assistant anlegen (BF700-Familie)
+
+Nach einem Zurücksetzen hat die Waage keine Benutzer mehr. Dann die Aktion **„Benutzer auf Waage anlegen“** (`beurer_ble.create_scale_user`, unter *Entwicklerwerkzeuge → Aktionen*) aufrufen mit:
+- der Waage
+- dem Kürzel (bis 3 Zeichen)
+- Geburtsdatum, Größe, Geschlecht und Aktivität (1–5)
+- optional einer HA-Person
+
+Danach auf die Waage steigen. Beim nächsten Verbinden legt die Integration den Benutzer an und ordnet ihn, falls angegeben, gleich der HA-Person zu.
+
+Einen neuen Benutzer erkennt die Waage erst nach einer **Referenzmessung**. Solange die fehlt, fordert die Integration sie bei jeder Verbindung an und wartet bis zu 2 Minuten:
+1. Draufsteigen, wiegen lassen und absteigen.
+2. Wenn die Waage dazu auffordert, barfuß wieder draufsteigen und stehen bleiben, bis Fett, Wasser und Muskeln angezeigt werden.
+
+Wiegungen ohne bekannten Benutzer, z. B. auf einer leeren Waage, werden als Gast-Wiegung gespeichert.
+
+## Freigabecodes (nur Standard-Waagen)
+
+Diese Waagen geben gespeicherte Daten einer Person nur nach einem vierstelligen Freigabecode heraus. Den Code hat die App festgelegt, die die Person auf der Waage angelegt hat.
+
+Die Codes unter *Einstellungen → Geräte & Dienste → Beurer BLE → Konfigurieren* als `Platz:Code` eintragen, z. B. `1:1234, 2:5678`. Die Platznummern stehen nach der ersten Verbindung im Debug-Log.
+
+Ohne Code kommen nur die Messungen an, die gemacht werden, während Home Assistant verbunden ist.
+
+## Hinweise
+
+- Die Geräte erlauben immer nur **eine** Verbindung. HealthManager auf dem Handy schließen, sonst schnappt es sich das Gerät zuerst.
+- Manche Geräte verlangen eine Kopplung. Verlangt ein Gerät Verschlüsselung, versucht die Integration einmal selbst zu koppeln.
+- Debug-Log einschalten:
+  ```yaml
+  logger:
+    logs:
+      custom_components.beurer_ble: debug
+  ```
+
+## Tests
+
+```bash
+python3 tests/test_session.py custom_components/beurer_ble
+```
+
+Testet alle Gerätefamilien gegen nachgebaute Geräte. Braucht weder Home Assistant noch bleak.
+
+## Lizenz
+
+MIT. Das Protokollwissen stammt aus openScale (GPL-3.0), der Code hier ist eine eigenständige Python-Umsetzung.
+
+---
+
+## English
+
 Home Assistant custom integration for **Beurer / Sanitas Bluetooth scales and blood pressure monitors**. It talks to the devices directly over Bluetooth, through the local adapter or ESPHome Bluetooth proxies. It needs no cloud, no app and no ESP firmware of its own.
 
 The scale protocols follow the reverse-engineered implementations in [openScale](https://github.com/oliexdev/openScale). Blood pressure monitors use the standard Bluetooth Blood Pressure profile.
 
-> **Status:** All three device families are tested against simulated devices only. None has been tested against real hardware yet.
+> **Status:** Beta. The BF700 has been tested with a real scale: connection, creating a user and live weighings. The other device families are tested against simulated devices only.
 
 ## Supported devices
 
@@ -70,7 +188,11 @@ After a reset the scale has no users. Call the action **`beurer_ble.create_scale
 - birthday, height, gender and activity
 - optionally an HA person
 
-Then step on the scale and stay on it until the reference measurement is done. The integration creates the user at the next connection, starts the reference measurement and, if a person was given, maps the user to that HA person.
+Then step on the scale. The integration creates the user at the next connection and, if a person was given, maps the user to that HA person.
+
+The scale only recognises a new user after a **reference measurement**. Until it has one, the integration requests it at every connection and waits up to 2 minutes:
+1. Step on, get weighed and step off.
+2. When the scale asks for it, step on again barefoot and stay until fat, water and muscle are shown.
 
 Weighings without a known user (for example on an empty scale) are kept as a guest weighing.
 
