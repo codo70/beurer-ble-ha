@@ -80,6 +80,8 @@ class BeurerCoordinator:
         # User to create on the scale at the next connection, plus the HA person for it.
         self.pending_user: NewUser | None = None
         self.pending_person: str | None = None
+        # Scale users that still need their reference measurement.
+        self.needs_reference: set[int] = set()
         self.auto_assign: bool = entry.options.get(CONF_AUTO_ASSIGN, True)
 
     def ha_person(self, pid: str) -> str | None:
@@ -119,6 +121,7 @@ class BeurerCoordinator:
             self.latest = data.get("latest", {})
             self.battery = data.get("battery")
             self._start_byte = data.get("start_byte", self._start_byte)
+            self.needs_reference = set(data.get("needs_reference", []))
         self._unsub = bluetooth.async_register_callback(
             self.hass,
             self._async_on_advertisement,
@@ -150,7 +153,14 @@ class BeurerCoordinator:
     def _make_session(self, client):
         tz = dt_util.get_default_time_zone()
         if self.model.family == FAMILY_SANITAS:
-            return SanitasSession(client, self._start_byte, self.pending_user)
+            # Users the scale has never measured with body analysis need a reference
+            # measurement first, otherwise the scale does not recognise them.
+            refs = set(self.needs_reference) | {
+                int(pid)
+                for pid in self.persons
+                if pid.isdigit() and int(pid) > 0 and not self.latest.get(pid, {}).get("fat_pct")
+            }
+            return SanitasSession(client, self._start_byte, self.pending_user, refs)
         if self.model.family == FAMILY_STANDARD:
             consents = parse_consents(self.entry.options.get(CONF_CONSENT))
             return StandardSession(client, tz, self.model, consents)
@@ -185,8 +195,18 @@ class BeurerCoordinator:
                 pass
             self._last_run = time.monotonic()
         if isinstance(session, SanitasSession):
+            if session.created_uid is not None:
+                self.needs_reference.add(session.created_uid)
+            # A full body analysis for the user means the scale knows them now.
+            done = {
+                uid
+                for uid, lst in session.measurements.items()
+                if any(m.fat_pct for m in lst)
+            }
+            self.needs_reference -= done
             await self._async_process(*self._from_sanitas(session))
             await self._async_finish_user_creation(session)
+            await self._async_save()
         else:
             await self._async_process(
                 session.persons, session.measurements, session.battery, session.connected_ok
@@ -272,11 +292,15 @@ class BeurerCoordinator:
         if changed or ok:
             async_dispatcher_send(self.hass, SIGNAL_UPDATE.format(self.entry.entry_id))
         if changed:
-            await self._store.async_save(
-                {
-                    "persons": self.persons,
-                    "latest": self.latest,
-                    "battery": self.battery,
-                    "start_byte": self._start_byte,
-                }
-            )
+            await self._async_save()
+
+    async def _async_save(self) -> None:
+        await self._store.async_save(
+            {
+                "persons": self.persons,
+                "latest": self.latest,
+                "battery": self.battery,
+                "start_byte": self._start_byte,
+                "needs_reference": sorted(self.needs_reference),
+            }
+        )

@@ -47,7 +47,7 @@ CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb"
 ACK_TIMEOUT = 8.0
 # While someone stands on the scale it may only answer after the weighing.
 STATUS_TIMEOUT = 30.0
-REFERENCE_TIMEOUT = 60.0
+REFERENCE_TIMEOUT = 120.0
 DATA_TIMEOUT = 15.0
 
 
@@ -55,10 +55,15 @@ class SanitasSession:
     """Download users and measurements from the scale over one connection."""
 
     def __init__(
-        self, client: BleakClient, start_byte: int, new_user: NewUser | None = None
+        self,
+        client: BleakClient,
+        start_byte: int,
+        new_user: NewUser | None = None,
+        reference_uids: set[int] | None = None,
     ) -> None:
         """Initialise."""
         self._new_user = new_user
+        self._reference_uids = set(reference_uids or ())
         self.created_uid: int | None = None
         self.create_error: str | None = None
         self.live_weight: float | None = None
@@ -216,11 +221,19 @@ class SanitasSession:
         self.created_uid = uid
         self.users[uid] = ScaleUser(uid, user.initials.upper()[:3], user.birth_year)
         _LOGGER.info("Created user %s on the scale (uid %s)", user.initials, uid)
-        # Reference measurement: the person has to stand on the scale now.
+        self._reference_uids.add(uid)
+
+    async def _reference(self, uid: int) -> None:
+        """Ask the scale to measure this user now (reference / first weighing)."""
+        _LOGGER.info("Reference measurement for uid %s: step on the scale now", uid)
         await self._write(cmd_frame(self._start, CMD_DO_MEASUREMENT, uid_bytes(uid)))
         try:
-            await self._wait_ack(CMD_DO_MEASUREMENT, ACK_TIMEOUT)
+            ack = await self._wait_ack(CMD_DO_MEASUREMENT, ACK_TIMEOUT)
+            if len(ack) > 3 and ack[3] != 0:
+                _LOGGER.debug("Scale rejected the measurement request for uid %s", uid)
+                return
             await self._wait_until(lambda: uid in self.measurements, REFERENCE_TIMEOUT)
+            _LOGGER.info("Reference measurement for uid %s received", uid)
         except TimeoutError:
             _LOGGER.debug("No reference measurement received for uid %s", uid)
 
@@ -240,6 +253,9 @@ class SanitasSession:
 
         if self._new_user is not None:
             await self._create_user(self._new_user)
+        for uid in sorted(self._reference_uids):
+            if uid in self.users and uid not in self.measurements:
+                await self._reference(uid)
 
         await self._fetch_saved()
 
