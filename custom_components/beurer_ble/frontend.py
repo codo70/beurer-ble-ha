@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 codo70. Scale protocols based on openScale (C) olie.xdev, GPL-3.0-or-later.
 """Lovelace card for the Beurer BLE integration and its websocket API."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 codo70. Scale protocols based on openScale (C) olie.xdev, GPL-3.0-or-later.
 """Sync session for Beurer / Sanitas scales that use the standard BLE profiles.
 
 Weight Scale (0x181D), Body Composition (0x181B) and User Data (0x181C) services,

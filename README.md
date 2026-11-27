@@ -134,7 +134,9 @@ Testet alle Gerätefamilien gegen nachgebaute Geräte. Braucht weder Home Assist
 
 ## Lizenz
 
-MIT. Das Protokollwissen stammt aus openScale (GPL-3.0), der Code hier ist eine eigenständige Python-Umsetzung.
+**GPL-3.0-or-later** (siehe [LICENSE](LICENSE)). Copyright © 2026 codo70.
+
+Die Protokoll-Umsetzung für die Waagen orientiert sich eng an [openScale](https://github.com/oliexdev/openScale) (© olie.xdev, GPL-3.0-or-later). Deshalb steht diese Integration unter derselben Lizenz: Sie darf frei genutzt, verändert und weitergegeben werden; veränderte Versionen müssen wieder unter der GPL mit Quellcode weitergegeben werden.
 
 ---
 
@@ -268,4 +270,6 @@ This runs every family against fake devices. It needs neither Home Assistant nor
 
 ## License
 
-MIT. The protocol knowledge comes from openScale (GPL-3.0); the code here is an independent Python implementation.
+**GPL-3.0-or-later** (see [LICENSE](LICENSE)). Copyright © 2026 codo70.
+
+The scale protocol implementation closely follows [openScale](https://github.com/oliexdev/openScale) (© olie.xdev, GPL-3.0-or-later), so this integration uses the same license: you may use, modify and share it freely; modified versions must again be shared under the GPL with source code.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 codo70. Scale protocols based on openScale (C) olie.xdev, GPL-3.0-or-later.
 """Beurer BF700/BF710/BF800 / Sanitas SBF70 BLE protocol.
 
 Pure functions only (no Home Assistant imports) so they can be tested alone.

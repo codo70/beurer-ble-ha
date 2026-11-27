@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 codo70. Scale protocols based on openScale (C) olie.xdev, GPL-3.0-or-later.
 """Sync session for the Beurer BF700/BF710/BF800 / Sanitas SBF70 family (no HA imports)."""
 
 from __future__ import annotations

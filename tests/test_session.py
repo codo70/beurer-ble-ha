@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 codo70. Scale protocols based on openScale (C) olie.xdev, GPL-3.0-or-later.
 """Offline tests with fake devices. Run: python3 tests/test_session.py custom_components/beurer_ble"""
 import asyncio, struct, sys, types, importlib.util, pathlib
 pkg_dir = pathlib.Path(sys.argv[1])
