@@ -1,4 +1,4 @@
-# HA openScale Beurer
+# Beurer BLE HA
 
 Home Assistant custom integration for **Beurer / Sanitas Bluetooth scales and blood pressure monitors**. It talks to the devices directly over Bluetooth, through the local adapter or ESPHome Bluetooth proxies. It needs no cloud, no app and no ESP firmware of its own.
 
