@@ -230,5 +230,10 @@ print("real BF700 frame OK")
 # ---------------------------------------------------------------- real BM 85 frame (2026-11-27)
 u, ts, v = bpm.parse_bp_measurement(bytes.fromhex("568d0064000000e707020c111f0000480000 00".replace(" ", "")), timezone.utc)
 assert (v["systolic"], v["diastolic"], v["pulse"], v["irregular_pulse"]) == (141, 100, 72, False), v
-assert ts == 1676223060 and u is None, ts
+assert ts == 1676223060 and u == 1, (ts, u)
+# user 2 (byte 01) and the big-endian status word
+u, ts, v = bpm.parse_bp_measurement(bytes.fromhex("5673004f000000e907041b07020000400100 00".replace(" ", "")), timezone.utc)
+assert u == 2 and v["systolic"] == 115 and v["pulse"] == 64 and v["status_raw"] == 0, (u, v)
+u, ts, v = bpm.parse_bp_measurement(bytes.fromhex("56870 05e00000020 08041b0e310000510000 04".replace(" ", "")), timezone.utc)
+assert u == 1 and v["irregular_pulse"] is True and v["status_raw"] == 4, (u, v)
 print("real BM85 frame OK")

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import tzinfo
 import logging
-import time
 
 from bleak import BleakClient
 
@@ -63,9 +62,15 @@ def parse_bp_measurement(data: bytes, tz: tzinfo | None) -> tuple[int | None, in
     if flags & 0x08 and len(data) > off:
         user = data[off]
         off += 1
+    elif flags & 0x40 and len(data) > off:
+        # Beurer extension (seen on the BM 85): flag bit 6 = one byte user index,
+        # 0-based (0 = user 1, 1 = user 2), where the standard user id would be.
+        user = data[off] + 1
+        off += 1
     status = None
     if flags & 0x10 and len(data) >= off + 2:
-        status = u16le(data, off)
+        # The BM 85 sends 16-bit values after the timestamp big-endian (pulse too).
+        status = int.from_bytes(data[off : off + 2], "big" if flags & 0x40 else "little")
 
     def mmhg(v: float | None) -> int | None:
         return round(v * factor) if v else None
@@ -80,6 +85,7 @@ def parse_bp_measurement(data: bytes, tz: tzinfo | None) -> tuple[int | None, in
         values["irregular_pulse"] = bool(status & 0x0004)
         values["body_movement"] = bool(status & 0x0001)
         values["cuff_fit_ok"] = not status & 0x0002
+        values["status_raw"] = status
     if not values["systolic"]:
         return None
     return user, ts, values
@@ -97,13 +103,14 @@ class BPMSession(BaseSession):
         if tag != "bp" or (parsed := parse_bp_measurement(data, self._tz)) is None:
             return
         user, ts, values = parsed
-        pid = str(user) if user not in (None, 0xFF) else "1"
+        pid = str(user) if user not in (None, 0, 0xFF) else "1"
         self.persons.setdefault(pid, f"Benutzer {pid}")
-        if ts is None:
-            # No clock on the device: keep the readings apart by arrival order.
-            self._seq += 1
-            ts = int(time.time()) - 1000 + self._seq
-        self.add_measurement(pid, {"timestamp": ts, **values})
+        # Keep the device timestamp as given (it may be wrong); the coordinator
+        # decides what is new by content and order, not by this clock.
+        self._seq += 1
+        self.measurements.setdefault(pid, []).append(
+            {"device_ts": ts, "seq": self._seq, **values}
+        )
         if self.on_data is not None:
             self.on_data()
 

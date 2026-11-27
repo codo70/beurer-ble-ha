@@ -82,6 +82,9 @@ class BeurerCoordinator:
         self.pending_person: str | None = None
         # Scale users that still need their reference measurement.
         self.needs_reference: set[int] = set()
+        # Blood pressure monitors resend all stored readings every time and their
+        # clock may be wrong: remember readings already seen (by content).
+        self._seen: dict[str, None] = {}
         self.auto_assign: bool = entry.options.get(CONF_AUTO_ASSIGN, True)
 
     def ha_person(self, pid: str) -> str | None:
@@ -122,6 +125,7 @@ class BeurerCoordinator:
             self.battery = data.get("battery")
             self._start_byte = data.get("start_byte", self._start_byte)
             self.needs_reference = set(data.get("needs_reference", []))
+            self._seen = dict.fromkeys(data.get("seen", []))
         self._unsub = bluetooth.async_register_callback(
             self.hass,
             self._async_on_advertisement,
@@ -190,9 +194,7 @@ class BeurerCoordinator:
                 self._async_process(*self._from_sanitas(session))
             )
         elif isinstance(session, BPMSession):
-            session.on_data = lambda: self.hass.async_create_task(
-                self._async_process(session.persons, session.measurements, session.battery, True)
-            )
+            session.on_data = lambda: self.hass.async_create_task(self._async_process_bpm(session))
         try:
             await session.run(LISTEN_TIME)
         except (BleakError, TimeoutError, ScaleDisconnected) as err:
@@ -216,6 +218,8 @@ class BeurerCoordinator:
             await self._async_process(*self._from_sanitas(session))
             await self._async_finish_user_creation(session)
             await self._async_save()
+        elif isinstance(session, BPMSession):
+            await self._async_process_bpm(session)
         else:
             await self._async_process(
                 session.persons, session.measurements, session.battery, session.connected_ok
@@ -303,6 +307,54 @@ class BeurerCoordinator:
         if changed:
             await self._async_save()
 
+    async def _async_process_bpm(self, session: BPMSession) -> None:
+        """New = never seen before; latest = last one the monitor sent (its memory order)."""
+        now = time.time()
+        changed = False
+        for pid, label in session.persons.items():
+            if pid not in self.persons:
+                self.persons[pid] = label
+                changed = True
+        for pid, lst in session.measurements.items():
+            newest = None
+            for raw in lst:
+                key = "|".join(
+                    str(raw.get(k)) for k in ("device_ts", "systolic", "diastolic", "pulse")
+                )
+                key = f"{pid}|{key}"
+                if key in self._seen:
+                    continue
+                self._seen[key] = None
+                ts = raw.get("device_ts")
+                plausible = ts is not None and 1262304000 <= ts <= now + 86400
+                meas = {k: v for k, v in raw.items() if k not in ("device_ts", "seq")}
+                meas["timestamp"] = ts if plausible else int(now)
+                meas["device_time_ok"] = plausible
+                self.hass.bus.async_fire(
+                    EVENT_MEASUREMENT,
+                    {
+                        "address": self.address,
+                        "person": pid,
+                        "person_name": self.persons.get(pid, pid),
+                        "ha_person": self.ha_person(pid),
+                        **meas,
+                    },
+                )
+                newest = meas
+            if newest is not None:
+                self.latest[pid] = newest
+                changed = True
+        if session.battery is not None and session.battery != self.battery:
+            self.battery = session.battery
+            changed = True
+        if len(self._seen) > 5000:
+            self._seen = dict.fromkeys(list(self._seen)[-5000:])
+        if changed or session.connected_ok:
+            self.last_sync = now
+            async_dispatcher_send(self.hass, SIGNAL_UPDATE.format(self.entry.entry_id))
+        if changed:
+            await self._async_save()
+
     async def _async_save(self) -> None:
         await self._store.async_save(
             {
@@ -311,5 +363,6 @@ class BeurerCoordinator:
                 "battery": self.battery,
                 "start_byte": self._start_byte,
                 "needs_reference": sorted(self.needs_reference),
+                "seen": list(self._seen),
             }
         )

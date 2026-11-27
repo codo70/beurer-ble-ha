@@ -67,7 +67,7 @@ SENSORS: dict[str, BeurerSensorDescription] = {
         ),
         BeurerSensorDescription(
             key="systolic", name="Blutdruck systolisch", icon="mdi:heart-pulse", **_MMHG,
-            attr_keys=("irregular_pulse", "body_movement", "cuff_fit_ok"),
+            attr_keys=("irregular_pulse", "body_movement", "cuff_fit_ok", "status_raw", "device_time_ok"),
         ),
         BeurerSensorDescription(key="diastolic", name="Blutdruck diastolisch", icon="mdi:heart-pulse", **_MMHG),
         BeurerSensorDescription(
