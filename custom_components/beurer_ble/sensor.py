@@ -13,6 +13,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfMass
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import CONNECTION_BLUETOOTH, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -20,6 +21,7 @@ from homeassistant.util import dt as dt_util
 
 from . import BeurerConfigEntry
 from .const import DOMAIN, SIGNAL_UPDATE
+from .devices import FAMILY_BPM
 from .coordinator import BeurerCoordinator
 
 
@@ -60,12 +62,12 @@ SENSORS: dict[str, BeurerSensorDescription] = {
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
         BeurerSensorDescription(
-            key="systolic", name="Systolisch", icon="mdi:heart-pulse", **_MMHG,
+            key="systolic", name="Blutdruck systolisch", icon="mdi:heart-pulse", **_MMHG,
             attr_keys=("irregular_pulse", "body_movement", "cuff_fit_ok"),
         ),
-        BeurerSensorDescription(key="diastolic", name="Diastolisch", icon="mdi:heart-pulse", **_MMHG),
+        BeurerSensorDescription(key="diastolic", name="Blutdruck diastolisch", icon="mdi:heart-pulse", **_MMHG),
         BeurerSensorDescription(
-            key="mean_arterial", name="Mitteldruck", icon="mdi:heart-pulse",
+            key="mean_arterial", name="Blutdruck Mitteldruck", icon="mdi:heart-pulse",
             entity_registry_enabled_default=False, **_MMHG,
         ),
         BeurerSensorDescription(
@@ -86,6 +88,18 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     added: set[tuple[str, str]] = set()
 
+    # Drop entities left over from an earlier person mapping.
+    expected = {f"{coordinator.address}_battery"} | {
+        person_unique_id(coordinator, pid, key)
+        for pid, meas in coordinator.latest.items()
+        for key in meas
+        if key in SENSORS and meas[key] is not None
+    }
+    registry = er.async_get(hass)
+    for reg in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if reg.domain == "sensor" and reg.unique_id not in expected:
+            registry.async_remove(reg.entity_id)
+
     @callback
     def _add_new() -> None:
         new = []
@@ -102,6 +116,14 @@ async def async_setup_entry(
     entry.async_on_unload(
         async_dispatcher_connect(hass, SIGNAL_UPDATE.format(entry.entry_id), _add_new)
     )
+
+
+def person_unique_id(coordinator: BeurerCoordinator, pid: str, key: str) -> str:
+    """Unique id; includes the HA person so a new mapping gives fresh entities."""
+    base = f"{coordinator.address}_{pid}_{key}"
+    if person := coordinator.ha_person(pid):
+        return f"{base}_{person}"
+    return base
 
 
 class _BeurerEntity(SensorEntity):
@@ -157,9 +179,21 @@ class BeurerPersonSensor(_BeurerEntity):
         super().__init__(coordinator)
         self.entity_description = description
         self._pid = pid
-        label = coordinator.persons.get(pid, pid)
-        self._attr_name = f"{label} {description.name}"
-        self._attr_unique_id = f"{coordinator.address}_{pid}_{description.key}"
+        name = description.name
+        if description.key == "timestamp":
+            name = "Letzte Blutdruckmessung" if coordinator.model.family == FAMILY_BPM else "Letzte Wiegung"
+        self._attr_unique_id = person_unique_id(coordinator, pid, description.key)
+        if person := coordinator.ha_person(pid):
+            # One device per HA person, shared by all Beurer devices mapped to it.
+            self._attr_name = name
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, f"person_{person}")},
+                name=coordinator.ha_person_name(person),
+                manufacturer="Beurer",
+                model="Person",
+            )
+        else:
+            self._attr_name = f"{coordinator.persons.get(pid, pid)} {name}"
 
     @property
     def native_value(self) -> Any:
@@ -176,5 +210,8 @@ class BeurerPersonSensor(_BeurerEntity):
         meas = self.coordinator.latest.get(self._pid) or {}
         attrs = {k: meas[k] for k in self.entity_description.attr_keys if k in meas}
         if self.entity_description.key in ("weight_kg", "systolic"):
-            attrs["person_id"] = self._pid
+            attrs["device_person"] = self.coordinator.persons.get(self._pid, self._pid)
+            attrs["source"] = self.coordinator.name
+            if person := self.coordinator.ha_person(self._pid):
+                attrs["ha_person"] = person
         return attrs or None

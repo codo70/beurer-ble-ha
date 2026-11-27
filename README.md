@@ -43,7 +43,20 @@ Sensors are created per person (scale user or monitor memory) as soon as that pe
   - The systolic sensor's attributes also show irregular pulse, body movement and cuff fit.
 - **Every device:** a battery sensor (diagnostic).
 
-Every new measurement also fires the event `beurer_ble_measurement` with all its values. Use it in automations, or to log readings that arrive several at a time, for example blood pressure history.
+Every new measurement also fires the event `beurer_ble_measurement` with all its values and the mapped `ha_person`. Use it in automations, or to log readings that arrive several at a time, for example blood pressure history.
+
+## Assigning measurements to Home Assistant persons
+
+Under *Settings → Devices & services → Beurer BLE → Configure* every person found on the device appears, for example `COD [1]` or `Benutzer 1 [1]`. Pick an HA `person` for each one.
+
+**Effects of a mapping:**
+- Each HA person gets a device of their own, named after the person, for example "Christoph". The scale and the blood pressure monitor both put their sensors there, such as `sensor.christoph_gewicht` and `sensor.christoph_blutdruck_systolisch`.
+- When you change a mapping, the integration creates new entities and removes the old ones. The old ones' history stays in the recorder but is no longer linked.
+- The battery sensor stays on the physical device.
+
+**Assigning guest weighings by weight** (scales, on by default): the scale may not recognise a user and report a guest. The integration then gives the weighing to the person whose last weight is within 3 kg. The next candidate must be at least 2 kg further away, otherwise the weighing stays a guest weighing.
+
+The device still decides who measured. Home Assistant only translates its user into an HA person, so choosing the wrong memory on the monitor still files the reading under the wrong person.
 
 ## Consent codes (standard-profile scales only)
 

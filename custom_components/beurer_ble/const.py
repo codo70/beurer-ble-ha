@@ -15,3 +15,10 @@ COOLDOWN = 90
 LISTEN_TIME = 30
 
 SIGNAL_UPDATE = f"{DOMAIN}_update_{{}}"
+CONF_PERSONS = "persons"  # {device person id: HA person entity}
+CONF_AUTO_ASSIGN = "auto_assign"  # assign guest weighings by weight
+
+# Guest weighing goes to the person with the closest last weight if it is within
+# MAX_DIFF and the next candidate is at least MARGIN further away.
+AUTO_ASSIGN_MAX_DIFF = 3.0
+AUTO_ASSIGN_MARGIN = 2.0

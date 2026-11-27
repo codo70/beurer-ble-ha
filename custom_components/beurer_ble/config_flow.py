@@ -13,9 +13,17 @@ from homeassistant.components.bluetooth import (
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
 from homeassistant.core import callback
+from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
-from .const import CONF_CONSENT, CONF_FAMILY, CONF_MODEL, DOMAIN
-from .devices import FAMILY_STANDARD, DeviceModel, identify
+from .const import (
+    CONF_AUTO_ASSIGN,
+    CONF_CONSENT,
+    CONF_FAMILY,
+    CONF_MODEL,
+    CONF_PERSONS,
+    DOMAIN,
+)
+from .devices import FAMILY_BPM, FAMILY_STANDARD, DeviceModel, identify
 
 
 def _model_of(info: BluetoothServiceInfoBleak) -> DeviceModel | None:
@@ -35,7 +43,7 @@ class BeurerConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        """Options: consent codes for standard-profile scales."""
+        """Options: person mapping, guest assignment, consent codes."""
         return BeurerOptionsFlow()
 
     def _create(self, info: BluetoothServiceInfoBleak) -> ConfigFlowResult:
@@ -113,22 +121,47 @@ class BeurerConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class BeurerOptionsFlow(OptionsFlow):
-    """Consent codes (scale user slot: code) for standard-profile scales."""
+    """Map device persons to HA persons; consent codes; guest auto-assign."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Show the options form."""
-        if self.config_entry.data.get(CONF_FAMILY) != FAMILY_STANDARD:
-            return self.async_abort(reason="no_options")
+        entry = self.config_entry
+        family = entry.data.get(CONF_FAMILY)
+        coordinator = getattr(entry, "runtime_data", None)
+        persons: dict[str, str] = dict(coordinator.persons) if coordinator else {}
+        current: dict[str, str] = entry.options.get(CONF_PERSONS, {})
+        # Form field label -> device person id
+        fields = {f"{label} [{pid}]": pid for pid, label in sorted(persons.items())}
+
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            data: dict[str, Any] = {
+                CONF_PERSONS: {
+                    pid: user_input[field] for field, pid in fields.items() if user_input.get(field)
+                }
+            }
+            if family == FAMILY_STANDARD:
+                data[CONF_CONSENT] = user_input.get(CONF_CONSENT, "")
+            if family != FAMILY_BPM:
+                data[CONF_AUTO_ASSIGN] = user_input.get(CONF_AUTO_ASSIGN, True)
+            return self.async_create_entry(data=data)
+
+        schema: dict[Any, Any] = {}
+        for field, pid in fields.items():
+            schema[
+                vol.Optional(field, description={"suggested_value": current.get(pid)})
+            ] = EntitySelector(EntitySelectorConfig(domain="person"))
+        if family != FAMILY_BPM:
+            schema[
+                vol.Optional(CONF_AUTO_ASSIGN, default=entry.options.get(CONF_AUTO_ASSIGN, True))
+            ] = bool
+        if family == FAMILY_STANDARD:
+            schema[
+                vol.Optional(CONF_CONSENT, default=entry.options.get(CONF_CONSENT, ""))
+            ] = str
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_CONSENT,
-                        default=self.config_entry.options.get(CONF_CONSENT, ""),
-                    ): str
-                }
-            ),
+            data_schema=vol.Schema(schema),
+            description_placeholders={
+                "persons": ", ".join(fields) if fields else "–",
+            },
         )

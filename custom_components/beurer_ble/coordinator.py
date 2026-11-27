@@ -16,8 +16,17 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from .assign import pick_by_weight
 from .bpm_session import BPMSession
-from .const import CONF_CONSENT, COOLDOWN, DOMAIN, LISTEN_TIME, SIGNAL_UPDATE
+from .const import (
+    CONF_AUTO_ASSIGN,
+    CONF_CONSENT,
+    CONF_PERSONS,
+    COOLDOWN,
+    DOMAIN,
+    LISTEN_TIME,
+    SIGNAL_UPDATE,
+)
 from .devices import FAMILY_SANITAS, FAMILY_STANDARD, DeviceModel
 from .gatt import ScaleDisconnected
 from .sanitas_protocol import start_byte_for_name
@@ -27,6 +36,9 @@ from .standard_session import StandardSession
 _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1
 EVENT_MEASUREMENT = f"{DOMAIN}_measurement"
+
+
+GUEST_PIDS = ("guest",)
 
 
 def parse_consents(text: str | None) -> dict[int, int]:
@@ -64,6 +76,38 @@ class BeurerCoordinator:
         self._task: asyncio.Task | None = None
         self._last_run = 0.0
         self._unsub: CALLBACK_TYPE | None = None
+        self.person_map: dict[str, str] = dict(entry.options.get(CONF_PERSONS, {}))
+        self.auto_assign: bool = entry.options.get(CONF_AUTO_ASSIGN, True)
+
+    def ha_person(self, pid: str) -> str | None:
+        """HA person entity a device person is mapped to."""
+        return self.person_map.get(pid)
+
+    def ha_person_name(self, person: str) -> str:
+        """Friendly name of an HA person entity."""
+        if (state := self.hass.states.get(person)) is not None:
+            return state.name
+        return person.split(".", 1)[-1].replace("_", " ").title()
+
+    def _assign_guests(self, measurements: dict[str, list[dict]]) -> dict[str, list[dict]]:
+        """Move guest weighings to the person with the matching weight."""
+        if not self.auto_assign:
+            return measurements
+        candidates = {
+            pid: m["weight_kg"]
+            for pid, m in self.latest.items()
+            if pid not in GUEST_PIDS and m.get("weight_kg")
+        }
+        result: dict[str, list[dict]] = {}
+        for pid, lst in measurements.items():
+            for meas in lst:
+                target = pid
+                if pid in GUEST_PIDS and meas.get("weight_kg"):
+                    target = pick_by_weight(meas["weight_kg"], candidates) or pid
+                    if target != pid:
+                        _LOGGER.debug("Guest weighing %.1f kg assigned to %s", meas["weight_kg"], target)
+                result.setdefault(target, []).append(meas)
+        return result
 
     async def async_start(self) -> None:
         """Load stored state and start listening for advertisements."""
@@ -162,6 +206,7 @@ class BeurerCoordinator:
         ok: bool,
     ) -> None:
         changed = False
+        measurements = self._assign_guests(measurements)
         for pid, label in persons.items():
             generic = label in (f"P{pid}", f"Benutzer {pid}", "Gast")
             if self.persons.get(pid) != label and not (generic and pid in self.persons):
@@ -176,7 +221,13 @@ class BeurerCoordinator:
             for meas in new:
                 self.hass.bus.async_fire(
                     EVENT_MEASUREMENT,
-                    {"address": self.address, "person": pid, "person_name": self.persons[pid], **meas},
+                    {
+                        "address": self.address,
+                        "person": pid,
+                        "person_name": self.persons[pid],
+                        "ha_person": self.ha_person(pid),
+                        **meas,
+                    },
                 )
             self.latest[pid] = new[-1]
             changed = True

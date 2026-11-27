@@ -172,3 +172,12 @@ async def test_std():
     print("standard session OK", m)
 asyncio.run(test_std())
 print("ALL OK")
+
+# ---------------------------------------------------------------- guest assignment by weight
+const = load("const"); assign = load("assign")
+pick = assign.pick_by_weight
+assert pick(81.0, {"1": 80.2, "2": 62.0}) == "1"
+assert pick(70.0, {"1": 80.2, "2": 62.0}) is None          # nobody close enough
+assert pick(80.0, {"1": 79.5, "2": 81.0}) is None          # ambiguous
+assert pick(62.5, {"2": 62.0}) == "2" and pick(62.5, {}) is None
+print("guest assignment OK")
