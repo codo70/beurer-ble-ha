@@ -48,6 +48,8 @@ ACK_TIMEOUT = 8.0
 # While someone stands on the scale it may only answer after the weighing.
 STATUS_TIMEOUT = 30.0
 REFERENCE_TIMEOUT = 120.0
+# Re-arm the measurement request at least this often (seconds).
+REARM_INTERVAL = 9.0
 DATA_TIMEOUT = 15.0
 
 
@@ -67,6 +69,8 @@ class SanitasSession:
         self.created_uid: int | None = None
         self.create_error: str | None = None
         self.live_weight: float | None = None
+        # The scale sends e.g. "e0 01" when an armed measurement request expired.
+        self._request_expired = False
         self._client = client
         self._start = start_byte
         self._queue: asyncio.Queue[bytes | None] = asyncio.Queue()
@@ -137,6 +141,10 @@ class SanitasSession:
 
     async def _dispatch(self, data: bytes) -> None:
         """Handle a frame that is not the one currently awaited."""
+        if len(data) >= 1 and data[0] != self._start and data[0] & 0x0F == 0:
+            _LOGGER.debug("Scale idle/expiry notice: %s", data.hex(" "))
+            self._request_expired = True
+            return
         if len(data) < 4 or data[0] != self._start:
             return
         cmd = data[1]
@@ -224,17 +232,33 @@ class SanitasSession:
         self._reference_uids.add(uid)
 
     async def _reference(self, uid: int) -> None:
-        """Ask the scale to measure this user now (reference / first weighing)."""
+        """Ask the scale to measure this user (reference measurement).
+
+        The BF700 drops the request after about 10 s (it then sends "e0 01"),
+        so keep re-arming it until the measurement for this user arrives.
+        """
         _LOGGER.info("Reference measurement for uid %s: step on the scale now", uid)
-        await self._write(cmd_frame(self._start, CMD_DO_MEASUREMENT, uid_bytes(uid)))
-        try:
-            ack = await self._wait_ack(CMD_DO_MEASUREMENT, ACK_TIMEOUT)
+        deadline = time.monotonic() + REFERENCE_TIMEOUT
+        while uid not in self.measurements and time.monotonic() < deadline:
+            self._request_expired = False
+            await self._write(cmd_frame(self._start, CMD_DO_MEASUREMENT, uid_bytes(uid)))
+            try:
+                ack = await self._wait_ack(CMD_DO_MEASUREMENT, ACK_TIMEOUT)
+            except TimeoutError:
+                continue
             if len(ack) > 3 and ack[3] != 0:
                 _LOGGER.debug("Scale rejected the measurement request for uid %s", uid)
                 return
-            await self._wait_until(lambda: uid in self.measurements, REFERENCE_TIMEOUT)
+            try:
+                await self._wait_until(
+                    lambda: uid in self.measurements or self._request_expired,
+                    max(1.0, min(REARM_INTERVAL, deadline - time.monotonic())),
+                )
+            except TimeoutError:
+                pass
+        if uid in self.measurements:
             _LOGGER.info("Reference measurement for uid %s received", uid)
-        except TimeoutError:
+        else:
             _LOGGER.debug("No reference measurement received for uid %s", uid)
 
     async def run(self, listen_time: float) -> None:
