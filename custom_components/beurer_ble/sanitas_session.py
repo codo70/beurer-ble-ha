@@ -1,4 +1,4 @@
-"""One BLE sync session with the scale (bleak only, no HA imports)."""
+"""Sync session for the Beurer BF700/BF710/BF800 / Sanitas SBF70 family (no HA imports)."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ import time
 
 from bleak import BleakClient
 
-from .const import CHAR_UUID
-from .protocol import (
+from .gatt import ScaleDisconnected
+from .sanitas_protocol import (
     CMD_GET_SAVED_MEASUREMENTS,
     CMD_MEASUREMENT,
     CMD_SAVED_MEASUREMENT,
@@ -37,15 +37,13 @@ from .protocol import (
 
 _LOGGER = logging.getLogger(__name__)
 
+CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb"
+
 ACK_TIMEOUT = 8.0
 DATA_TIMEOUT = 15.0
 
 
-class ScaleDisconnected(Exception):
-    """The scale dropped the connection."""
-
-
-class BF700Session:
+class SanitasSession:
     """Download users and measurements from the scale over one connection."""
 
     def __init__(self, client: BleakClient, start_byte: int) -> None:

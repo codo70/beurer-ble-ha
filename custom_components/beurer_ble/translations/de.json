@@ -1,0 +1,34 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "bluetooth_confirm": {
+        "description": "{name} ({model}) einrichten?"
+      },
+      "user": {
+        "description": "Gerät wählen. Vorher auf die Waage steigen bzw. eine Messung starten, damit es sichtbar ist.",
+        "data": {
+          "address": "Gerät"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät ist schon eingerichtet.",
+      "no_devices_found": "Kein Gerät gefunden. Auf die Waage steigen bzw. messen und nochmal versuchen.",
+      "not_supported": "Gerät wird nicht unterstützt."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "Freigabecodes der Waagen-Benutzer als Platz:Code, getrennt mit Komma, z. B. 1:1234, 2:5678. Ohne Code liefert die Waage nur Messungen, während HA verbunden ist.",
+        "data": {
+          "consent_codes": "Freigabecodes"
+        }
+      }
+    },
+    "abort": {
+      "no_options": "Dieses Gerät hat keine Optionen."
+    }
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "name": "Beurer BF700 (openScale protocol)",
+  "name": "Beurer BLE (openScale)",
   "homeassistant": "2024.12.0",
   "render_readme": true
 }

@@ -1,0 +1,34 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "bluetooth_confirm": {
+        "description": "Set up {name} ({model})?"
+      },
+      "user": {
+        "description": "Choose the device. Step on the scale or take a reading first so it is awake and visible.",
+        "data": {
+          "address": "Device"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This device is already set up.",
+      "no_devices_found": "No device found. Step on the scale or take a reading, then try again.",
+      "not_supported": "Device not supported."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "Consent codes of the scale users as slot:code, separated by commas, e.g. 1:1234, 2:5678. Without a code the scale only reports measurements taken while HA is connected.",
+        "data": {
+          "consent_codes": "Consent codes"
+        }
+      }
+    },
+    "abort": {
+      "no_options": "This device has no options."
+    }
+  }
+}
