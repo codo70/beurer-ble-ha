@@ -1,5 +1,9 @@
 # Beurer BLE HA
 
+<img src="custom_components/beurer_ble/brand/logo@2x.png" alt="Beurer BLE" width="420">
+
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
+
 Home Assistant custom integration for **Beurer / Sanitas Bluetooth scales and blood pressure monitors**. It talks to the devices directly over Bluetooth, through the local adapter or ESPHome Bluetooth proxies. It needs no cloud, no app and no ESP firmware of its own.
 
 The scale protocols follow the reverse-engineered implementations in [openScale](https://github.com/oliexdev/openScale). Blood pressure monitors use the standard Bluetooth Blood Pressure profile.
