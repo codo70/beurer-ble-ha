@@ -18,7 +18,7 @@ Die Waagen-Protokolle folgen den nachgebauten Umsetzungen von [openScale](https:
 |---|---|---|
 | Beurer/Sanitas-Protokoll | BF700, BF710, BF800, Runtastic Libra, Sanitas SBF70, SilverCrest SBF75, Crane | Benutzer und gespeicherte Messungen werden ohne Code gelesen. Benutzer lassen sich aus HA anlegen. |
 | Standard-Waagenprofil | BF105, BF720, BF915, BF950, BF500, BF600, BF850, BF1000 (Grundwerte), Sanitas SBF72, SBF73, SBF76, SBF77 | Gespeicherte Daten brauchen pro Person einen **Freigabecode** (siehe unten). |
-| Blutdruck | BM 85 und andere Beurer BM/BC mit Bluetooth, dazu jedes Gerät mit dem Standard-Blutdruckdienst (0x1810) | Liest alle gespeicherten Messungen. Die vertauschten Puls-Bytes des BM 85 werden berücksichtigt. |
+| Blutdruck | **BM 85 (mit echtem Gerät getestet)** und andere Beurer BM/BC mit Bluetooth, dazu jedes Gerät mit dem Standard-Blutdruckdienst (0x1810) | Liest alle gespeicherten Messungen. Die vertauschten Puls-Bytes des BM 85 werden berücksichtigt. |
 
 Nicht unterstützt sind die BF450 (abweichendes Datenformat) und die Segmentwerte der BF1000.
 
@@ -147,7 +147,7 @@ The scale protocols follow the reverse-engineered implementations in [openScale]
 |---|---|---|
 | Beurer/Sanitas protocol | BF700, BF710, BF800, Runtastic Libra, Sanitas SBF70, SilverCrest SBF75, Crane | Users and stored measurements are read without any code. |
 | Standard scale profile | BF105, BF720, BF915, BF950, BF500, BF600, BF850, BF1000 (basic values), Sanitas SBF72, SBF73, SBF76, SBF77 | Stored data needs a **consent code** per user (see below). |
-| Blood pressure | BM 85 and other Beurer BM/BC monitors with Bluetooth, plus any monitor with the standard Blood Pressure service (0x1810) | Reads all stored readings. Handles the BM 85's swapped pulse bytes. |
+| Blood pressure | **BM 85 (tested with a real device)** and other Beurer BM/BC monitors with Bluetooth, plus any monitor with the standard Blood Pressure service (0x1810) | Reads all stored readings. Handles the BM 85's swapped pulse bytes. |
 
 Not supported: BF450 (non-standard data layout) and the BF1000 segment values.
 

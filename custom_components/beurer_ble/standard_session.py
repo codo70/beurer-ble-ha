@@ -265,6 +265,7 @@ class StandardSession(BaseSession):
         if ucp is not None:
             await self._client.start_notify(ucp, self._notify_cb("ucp"))
         self.connected_ok = True
+        self._log_services()
         await self._read_battery()
         await self._write_time()
         await self._read_user_list()

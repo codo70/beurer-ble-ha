@@ -112,6 +112,9 @@ class BPMSession(BaseSession):
         char = self._find_char(SVC_BLOOD_PRESSURE, CHR_BP_MEASUREMENT)
         if char is None:
             raise ScaleDisconnected("Blood Pressure service not found")
+        self._log_services()
+        # Set the clock first: some monitors only accept it before sending readings.
+        await self._write_time()
         await self._notify_with_pairing(char, "bp")
         self.connected_ok = True
         await self._read_battery()

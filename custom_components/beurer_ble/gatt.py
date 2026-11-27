@@ -26,6 +26,7 @@ SVC_BATTERY = uuid16(0x180F)
 CHR_BATTERY_LEVEL = uuid16(0x2A19)
 SVC_CURRENT_TIME = uuid16(0x1805)
 CHR_CURRENT_TIME = uuid16(0x2A2B)
+CHR_DATE_TIME = uuid16(0x2A08)
 
 
 class ScaleDisconnected(Exception):
@@ -149,15 +150,38 @@ class BaseSession:
         if data:
             self.battery = data[0]
 
-    async def _write_time(self) -> None:
-        if (char := self._find_char(SVC_CURRENT_TIME, CHR_CURRENT_TIME)) is None:
+    def _log_services(self) -> None:
+        """Debug: list every service and characteristic of the device."""
+        if not _LOGGER.isEnabledFor(logging.DEBUG):
             return
-        try:
-            await self._client.write_gatt_char(
-                char, current_time_payload(datetime.now(self._tz)), response=True
-            )
-        except BleakError as err:
-            _LOGGER.debug("Setting the device clock failed: %s", err)
+        for svc in self._client.services:
+            for char in svc.characteristics:
+                _LOGGER.debug("GATT %s / %s %s", svc.uuid, char.uuid, ",".join(char.properties))
+
+    async def _write_time(self) -> None:
+        """Set the device clock: Current Time (0x2A2B) or a writable Date Time (0x2A08)."""
+        now = datetime.now(self._tz)
+        targets = []
+        if (char := self._find_char(SVC_CURRENT_TIME, CHR_CURRENT_TIME)) is not None:
+            targets.append((char, current_time_payload(now)))
+        else:
+            for svc in self._client.services:
+                for char in svc.characteristics:
+                    if char.uuid == CHR_DATE_TIME and (
+                        "write" in char.properties or "write-without-response" in char.properties
+                    ):
+                        targets.append((char, current_time_payload(now)[:7]))
+        for char, payload in targets:
+            try:
+                await self._client.write_gatt_char(
+                    char, payload, response="write" in char.properties
+                )
+                _LOGGER.debug("Device clock set via %s", char.uuid)
+                return
+            except BleakError as err:
+                _LOGGER.debug("Setting the device clock via %s failed: %s", char.uuid, err)
+        if not targets:
+            _LOGGER.debug("Device offers no writable clock characteristic")
 
     async def _notify_with_pairing(self, char, tag: str) -> None:
         """Subscribe; if the device demands encryption, pair once and retry."""

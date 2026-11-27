@@ -92,13 +92,14 @@ print("bp parse OK", v)
 
 # ---------------------------------------------------------------- fake GATT client
 class Char:
-    def __init__(self, uuid): self.uuid = uuid
+    def __init__(self, uuid): self.uuid = uuid; self.properties = ["read", "write", "notify", "indicate"]
 class Svc:
-    def __init__(self, uuid, chars): self.uuid = uuid; self.chars = {c: Char(c) for c in chars}
+    def __init__(self, uuid, chars): self.uuid = uuid; self.chars = {c: Char(c) for c in chars}; self.characteristics = list(self.chars.values())
     def get_characteristic(self, u): return self.chars.get(u)
 class Services:
     def __init__(self, svcs): self.s = {x.uuid: x for x in svcs}
     def get_service(self, u): return self.s.get(u)
+    def __iter__(self): return iter(self.s.values())
 class FakeGatt:
     def __init__(self, svcs): self.services = Services(svcs); self.cbs = {}; self.writes = []; self.paired = False
     def send(self, uuid, data):
@@ -113,7 +114,7 @@ class FakeGatt:
 U = gatt.uuid16
 class FakeBM85(FakeGatt):
     def __init__(self):
-        super().__init__([Svc(U(0x1810), [U(0x2A35)]), Svc(U(0x180F), [U(0x2A19)])])
+        super().__init__([Svc(U(0x1810), [U(0x2A35), U(0x2A08)]), Svc(U(0x180F), [U(0x2A19)])])
     async def start_notify(self, char, cb):
         await super().start_notify(char, cb)
         self.send(U(0x2A35), bp_packet(120, 80, 93, (2026, 11, 26, 7, 0, 0), 70, 1, 0, swap_pulse=True))
@@ -127,6 +128,7 @@ async def test_bpm():
     ms = s.measurements["1"]
     assert len(ms) == 2 and ms[1]["systolic"] == 131 and ms[1]["pulse"] == 72, ms
     assert s.battery == 64 and s.persons == {"1": "Benutzer 1"}
+    assert any(u == U(0x2A08) and len(d) == 7 for u, d in s._client.writes), "BPM clock not set"
     print("bpm session OK")
 asyncio.run(test_bpm())
 
@@ -224,3 +226,9 @@ assert (m.weight_kg, m.impedance, m.fat_pct, m.water_pct, m.muscle_pct, m.bone_k
 assert (m.bmr_kcal, m.amr_kcal, m.bmi) == (1935, 2709, 27.7), m
 assert proto.Measurement.from_dict({k: v for k, v in m.as_dict().items() if k not in ("bmr_kcal", "amr_kcal", "bmi")}).bmi is None
 print("real BF700 frame OK")
+
+# ---------------------------------------------------------------- real BM 85 frame (2026-11-27)
+u, ts, v = bpm.parse_bp_measurement(bytes.fromhex("568d0064000000e707020c111f0000480000 00".replace(" ", "")), timezone.utc)
+assert (v["systolic"], v["diastolic"], v["pulse"], v["irregular_pulse"]) == (141, 100, 72, False), v
+assert ts == 1676223060 and u is None, ts
+print("real BM85 frame OK")
