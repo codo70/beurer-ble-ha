@@ -66,7 +66,10 @@ Die Integration bringt eine eigene Karte mit: *Dashboard bearbeiten → Karte hi
 type: custom:beurer-ble-card
 person: person.christoph   # optional, sonst die erste zugeordnete Person
 days: 90                   # Verlauf: 30, 90 oder 365 Tage
+show: scale                # optional: scale (Waage) oder blood_pressure (Blutdruck), leer = alles
 ```
+
+Mit `show` lässt sich je eine eigene Karte für die Waage und für den Blutdruck anlegen.
 
 - **Kacheln** mit den aktuellen Werten: Gewicht (mit Änderung zur letzten Wiegung), Körperfett, Wasser, Muskeln, Knochen, BMI, Grund- und Gesamtumsatz, Blutdruck und Puls. Es erscheint nur, was es für die Person gibt.
 - **Verlauf:** Eine Kachel antippen zeigt ihren Verlauf (beim Blutdruck systolisch und diastolisch). Oben lässt sich der Zeitraum umschalten. Doppelt antippen öffnet den Detail-Dialog.
@@ -188,7 +191,10 @@ The integration ships its own card: *Edit dashboard → Add card → "Beurer BLE
 type: custom:beurer-ble-card
 person: person.john   # optional, defaults to the first mapped person
 days: 90              # history: 30, 90 or 365 days
+show: scale           # optional: scale or blood_pressure, empty = everything
 ```
+
+Use `show` for one card per category (scale, blood pressure).
 
 - **Tiles** with the latest values: weight (with the change since the last weighing), body fat, water, muscle, bone, BMI, BMR, AMR, blood pressure and pulse. Only what exists for the person is shown.
 - **History:** tap a tile to chart it (systolic and diastolic for blood pressure). Switch the range at the top. Double-tap opens the more-info dialog.

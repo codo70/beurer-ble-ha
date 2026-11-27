@@ -4,6 +4,7 @@
  *   type: custom:beurer-ble-card
  *   person: person.himmelhof      # optional: HA person, device person id (entry:pid) or name
  *   days: 90                      # optional: history range (30, 90, 365)
+ *   show: scale                   # optional: scale | blood_pressure (default: everything)
  *
  * Shows the latest values of one person as tiles and the history of the
  * selected value as a chart. Entities come from the integration
@@ -19,8 +20,8 @@ const METRICS = [
   { key: "bmi", de: "BMI", en: "BMI", unit: "", dec: 1 },
   { key: "bmr_kcal", de: "Grundumsatz", en: "BMR", unit: "kcal", dec: 0 },
   { key: "amr_kcal", de: "Gesamtumsatz", en: "AMR", unit: "kcal", dec: 0 },
-  { key: "systolic", de: "Blutdruck", en: "Blood pressure", unit: "mmHg", dec: 0, bp: true },
-  { key: "pulse", de: "Puls", en: "Pulse", unit: "bpm", dec: 0 },
+  { key: "systolic", de: "Blutdruck", en: "Blood pressure", unit: "mmHg", dec: 0, bp: true, cat: "blood_pressure", main: true },
+  { key: "pulse", de: "Puls", en: "Pulse", unit: "bpm", dec: 0, cat: "blood_pressure" },
 ];
 const BY_KEY = Object.fromEntries(METRICS.map((m) => [m.key, m]));
 const RANGES = [30, 90, 365];
@@ -110,7 +111,10 @@ class BeurerBleCard extends HTMLElement {
   }
 
   _metricsOf(person) {
-    return METRICS.filter((m) => person.entities[m.key]);
+    const show = this._config.show;
+    return METRICS.filter(
+      (m) => person.entities[m.key] && (!show || (m.cat || "scale") === show)
+    );
   }
 
   _update() {
@@ -145,7 +149,11 @@ class BeurerBleCard extends HTMLElement {
       return;
     }
     const metrics = this._metricsOf(person);
-    if (!this._metric || !person.entities[this._metric]) {
+    if (!metrics.length) {
+      card.append(el("div", { class: "msg", text: this._t("empty") }));
+      return;
+    }
+    if (!this._metric || !metrics.some((m) => m.key === this._metric)) {
       this._metric = (metrics.find((m) => m.main) || metrics[0])?.key;
     }
 
@@ -155,7 +163,9 @@ class BeurerBleCard extends HTMLElement {
   }
 
   _header(person) {
-    const stamps = ["weight_kg", "systolic"]
+    const show = this._config.show;
+    const keys = show === "scale" ? ["weight_kg"] : show === "blood_pressure" ? ["systolic"] : ["weight_kg", "systolic"];
+    const stamps = keys
       .map((k) => person.entities[k] && this._hass.states[person.entities[k]]?.last_changed)
       .filter(Boolean)
       .map((s) => new Date(s));
@@ -164,7 +174,7 @@ class BeurerBleCard extends HTMLElement {
       ? last.toLocaleString(this._hass.language || undefined, { dateStyle: "medium", timeStyle: "short" })
       : "–";
     return el("div", { class: "header" }, [
-      el("ha-icon", { icon: "mdi:scale-bathroom" }),
+      el("ha-icon", { icon: show === "blood_pressure" ? "mdi:heart-pulse" : "mdi:scale-bathroom" }),
       el("div", { class: "title", text: this._config.title || person.name }),
       el("div", { class: "when", text: `${this._t("last")}: ${when}` }),
     ]);
@@ -366,21 +376,33 @@ class BeurerBleCardEditor extends HTMLElement {
   _render() {
     if (!this._hass || !this._config) return;
     const options = (this._persons || []).map((p) => ({ value: p.ha_person || p.id, label: p.name }));
+    const de = (this._hass.language || "de").startsWith("de");
     const form = document.createElement("ha-form");
     form.hass = this._hass;
     form.data = this._config;
     form.schema = [
       { name: "person", selector: { select: { options, mode: "dropdown" } } },
+      {
+        name: "show",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "scale", label: de ? "Waage" : "Scale" },
+              { value: "blood_pressure", label: de ? "Blutdruck" : "Blood pressure" },
+            ],
+          },
+        },
+      },
       { name: "title", selector: { text: {} } },
       {
         name: "days",
         selector: { select: { options: RANGES.map((d) => ({ value: String(d), label: String(d) })), mode: "dropdown" } },
       },
     ];
-    const de = (this._hass.language || "de").startsWith("de");
     const labels = de
-      ? { person: "Person", title: "Titel (optional)", days: "Verlauf in Tagen" }
-      : { person: "Person", title: "Title (optional)", days: "History in days" };
+      ? { person: "Person", show: "Anzeigen (leer = alles)", title: "Titel (optional)", days: "Verlauf in Tagen" }
+      : { person: "Person", show: "Show (empty = everything)", title: "Title (optional)", days: "History in days" };
     form.computeLabel = (s) => labels[s.name] || s.name;
     form.addEventListener("value-changed", (ev) => {
       this._config = ev.detail.value;
