@@ -2,25 +2,115 @@
   "domain": "beurer_ble",
   "name": "Beurer BLE (openScale)",
   "bluetooth": [
-    { "local_name": "BEURER*", "connectable": true },
-    { "local_name": "Beurer*", "connectable": true },
-    { "local_name": "BF*", "connectable": true },
-    { "local_name": "SBF*", "connectable": true },
-    { "local_name": "SANITAS*", "connectable": true },
-    { "local_name": "Sanitas*", "connectable": true },
-    { "local_name": "RT-Libra*", "connectable": true },
-    { "local_name": "Libra-*", "connectable": true },
-    { "local_name": "AICDSCALE1*", "connectable": true },
-    { "local_name": "BM*", "connectable": true },
-    { "local_name": "BC*", "connectable": true },
-    { "service_uuid": "00001810-0000-1000-8000-00805f9b34fb", "connectable": true }
+    {
+      "local_name": "BEURER*",
+      "connectable": true
+    },
+    {
+      "local_name": "Beurer*",
+      "connectable": true
+    },
+    {
+      "local_name": "SBF*",
+      "connectable": true
+    },
+    {
+      "local_name": "SANITAS*",
+      "connectable": true
+    },
+    {
+      "local_name": "Sanitas*",
+      "connectable": true
+    },
+    {
+      "local_name": "RT-Libra*",
+      "connectable": true
+    },
+    {
+      "local_name": "Libra-*",
+      "connectable": true
+    },
+    {
+      "local_name": "AICDSCALE1*",
+      "connectable": true
+    },
+    {
+      "local_name": "BF1*",
+      "connectable": true
+    },
+    {
+      "local_name": "BF5*",
+      "connectable": true
+    },
+    {
+      "local_name": "BF6*",
+      "connectable": true
+    },
+    {
+      "local_name": "BF7*",
+      "connectable": true
+    },
+    {
+      "local_name": "BF8*",
+      "connectable": true
+    },
+    {
+      "local_name": "BF9*",
+      "connectable": true
+    },
+    {
+      "local_name": "BF-*",
+      "connectable": true
+    },
+    {
+      "local_name": "BM5*",
+      "connectable": true
+    },
+    {
+      "local_name": "BM6*",
+      "connectable": true
+    },
+    {
+      "local_name": "BM7*",
+      "connectable": true
+    },
+    {
+      "local_name": "BM8*",
+      "connectable": true
+    },
+    {
+      "local_name": "BM9*",
+      "connectable": true
+    },
+    {
+      "local_name": "BM *",
+      "connectable": true
+    },
+    {
+      "local_name": "BC5*",
+      "connectable": true
+    },
+    {
+      "local_name": "BC8*",
+      "connectable": true
+    },
+    {
+      "local_name": "BC *",
+      "connectable": true
+    },
+    {
+      "service_uuid": "00001810-0000-1000-8000-00805f9b34fb",
+      "connectable": true
+    }
   ],
   "codeowners": [],
   "config_flow": true,
-  "dependencies": ["bluetooth_adapters"],
+  "dependencies": [
+    "bluetooth_adapters"
+  ],
   "documentation": "https://github.com/codo70/beurer-ble-ha",
   "integration_type": "device",
   "iot_class": "local_push",
   "requirements": [],
-  "version": "0.2.1"
+  "version": "0.2.2"
 }
