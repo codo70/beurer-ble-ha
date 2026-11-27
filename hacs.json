@@ -1,5 +1,5 @@
 {
-  "name": "Beurer BLE (openScale)",
+  "name": "Beurer BLE",
   "homeassistant": "2024.12.0",
   "render_readme": true
 }
