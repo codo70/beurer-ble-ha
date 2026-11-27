@@ -16,18 +16,23 @@ from .sanitas_protocol import (
     CMD_SAVED_MEASUREMENT,
     CMD_SCALE_STATUS,
     CMD_USER_INFO,
+    CMD_DO_MEASUREMENT,
+    CMD_USER_ADD,
     CMD_USER_LIST,
     CMD_WEIGHT_MEASUREMENT,
     NIBBLE_INIT,
     Measurement,
+    NewUser,
     ScaleStatus,
     ScaleUser,
+    user_add_payload,
     ack_frame,
     alt_byte,
     cmd_frame,
     init_frame,
     is_scale_ack,
     other_start_byte,
+    parse_live_weight,
     parse_measurement,
     parse_status,
     parse_user_info,
@@ -40,14 +45,23 @@ _LOGGER = logging.getLogger(__name__)
 CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb"
 
 ACK_TIMEOUT = 8.0
+# While someone stands on the scale it may only answer after the weighing.
+STATUS_TIMEOUT = 30.0
+REFERENCE_TIMEOUT = 60.0
 DATA_TIMEOUT = 15.0
 
 
 class SanitasSession:
     """Download users and measurements from the scale over one connection."""
 
-    def __init__(self, client: BleakClient, start_byte: int) -> None:
+    def __init__(
+        self, client: BleakClient, start_byte: int, new_user: NewUser | None = None
+    ) -> None:
         """Initialise."""
+        self._new_user = new_user
+        self.created_uid: int | None = None
+        self.create_error: str | None = None
+        self.live_weight: float | None = None
         self._client = client
         self._start = start_byte
         self._queue: asyncio.Queue[bytes | None] = asyncio.Queue()
@@ -146,7 +160,11 @@ class SanitasSession:
                     self._add_measurement(self._meas_uid, parse_measurement(bytes(self._meas_buf)))
             await self._write(ack_frame(self._start, data))
         elif cmd == CMD_WEIGHT_MEASUREMENT:
-            _LOGGER.debug("Live weight frame: %s", data.hex(" "))
+            if (live := parse_live_weight(data)) is not None:
+                stable, kg = live
+                _LOGGER.debug("Live weight %.2f kg (%s)", kg, "stable" if stable else "settling")
+                if stable and kg > 0:
+                    self.live_weight = round(kg, 2)
 
     # --- sequence --------------------------------------------------------
 
@@ -175,20 +193,53 @@ class SanitasSession:
                 await self._wait_until(lambda p=parts: self._saved_last_index >= p, DATA_TIMEOUT)
         self._saved_uid = None
 
+    async def _status(self) -> None:
+        """Ask for the scale status; tolerate a busy scale."""
+        await self._write(cmd_frame(self._start, CMD_SCALE_STATUS, bytes(8)))
+        try:
+            self.status = parse_status(await self._wait_ack(CMD_SCALE_STATUS, STATUS_TIMEOUT))
+        except TimeoutError:
+            _LOGGER.debug("No status answer, continuing anyway")
+
+    async def _create_user(self, user: NewUser) -> None:
+        """Create a user on the scale and start its reference measurement."""
+        uid = max([*self.users, 100]) + 1
+        await self._write(cmd_frame(self._start, CMD_USER_ADD, user_add_payload(uid, user)))
+        try:
+            ack = await self._wait_ack(CMD_USER_ADD, STATUS_TIMEOUT)
+        except TimeoutError:
+            self.create_error = "no_answer"
+            return
+        if len(ack) > 3 and ack[3] != 0:
+            self.create_error = "scale_full"
+            return
+        self.created_uid = uid
+        self.users[uid] = ScaleUser(uid, user.initials.upper()[:3], user.birth_year)
+        _LOGGER.info("Created user %s on the scale (uid %s)", user.initials, uid)
+        # Reference measurement: the person has to stand on the scale now.
+        await self._write(cmd_frame(self._start, CMD_DO_MEASUREMENT, uid_bytes(uid)))
+        try:
+            await self._wait_ack(CMD_DO_MEASUREMENT, ACK_TIMEOUT)
+            await self._wait_until(lambda: uid in self.measurements, REFERENCE_TIMEOUT)
+        except TimeoutError:
+            _LOGGER.debug("No reference measurement received for uid %s", uid)
+
     async def run(self, listen_time: float) -> None:
         """Run the full sync. Measurements are NOT deleted from the scale."""
         await self._client.start_notify(CHAR_UUID, self._on_notify)
         await self._init()
         await self._write(set_time_frame(self._start, int(time.time())))
-        await self._write(cmd_frame(self._start, CMD_SCALE_STATUS, bytes(8)))
-        self.status = parse_status(await self._wait_ack(CMD_SCALE_STATUS))
+        await self._status()
 
         await self._write(cmd_frame(self._start, CMD_USER_LIST))
-        ack = await self._wait_ack(CMD_USER_LIST)
+        ack = await self._wait_ack(CMD_USER_LIST, STATUS_TIMEOUT)
         count = ack[4] if len(ack) > 4 else 0
         if count:
             await self._wait_until(lambda: len(self.users) >= count, DATA_TIMEOUT)
         _LOGGER.debug("Scale users: %s", list(self.users.values()))
+
+        if self._new_user is not None:
+            await self._create_user(self._new_user)
 
         await self._fetch_saved()
 
@@ -198,4 +249,5 @@ class SanitasSession:
                 await self._wait_until(lambda: False, listen_time)
             except TimeoutError:
                 pass
-            await self._fetch_saved()
+            if self.users:
+                await self._fetch_saved()

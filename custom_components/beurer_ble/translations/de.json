@@ -29,5 +29,58 @@
         }
       }
     }
+  },
+  "services": {
+    "create_scale_user": {
+      "name": "Benutzer auf Waage anlegen",
+      "description": "Legt beim nächsten Verbinden einen Benutzer auf der Waage an (BF700/BF710/BF800/SBF70). Danach auf die Waage steigen und stehen bleiben, bis die Referenzmessung fertig ist.",
+      "fields": {
+        "config_entry": {
+          "name": "Waage",
+          "description": "Die Beurer-Waage."
+        },
+        "initials": {
+          "name": "Kürzel",
+          "description": "Bis zu 3 Buchstaben/Ziffern, wie sie die Waage anzeigt."
+        },
+        "birthday": {
+          "name": "Geburtsdatum",
+          "description": "Für die Körperfett-Berechnung."
+        },
+        "height": {
+          "name": "Größe",
+          "description": "Körpergröße in cm."
+        },
+        "gender": {
+          "name": "Geschlecht",
+          "description": "Für die Körperfett-Berechnung."
+        },
+        "activity": {
+          "name": "Aktivität",
+          "description": "1 = kaum aktiv … 5 = sehr aktiv."
+        },
+        "person": {
+          "name": "HA-Person",
+          "description": "Optional: Messwerte gleich dieser Person zuordnen."
+        }
+      }
+    }
+  },
+  "selector": {
+    "gender": {
+      "options": {
+        "male": "männlich",
+        "female": "weiblich"
+      }
+    },
+    "activity": {
+      "options": {
+        "1": "1 – kaum",
+        "2": "2 – wenig",
+        "3": "3 – mittel",
+        "4": "4 – viel",
+        "5": "5 – sehr viel"
+      }
+    }
   }
 }

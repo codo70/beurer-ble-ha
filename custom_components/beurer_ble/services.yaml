@@ -1,0 +1,42 @@
+create_scale_user:
+  fields:
+    config_entry:
+      required: true
+      selector:
+        config_entry:
+          integration: beurer_ble
+    initials:
+      required: true
+      example: COD
+      selector:
+        text:
+    birthday:
+      required: true
+      selector:
+        date:
+    height:
+      required: true
+      example: 180
+      selector:
+        number:
+          min: 80
+          max: 230
+          unit_of_measurement: cm
+    gender:
+      required: true
+      selector:
+        select:
+          translation_key: gender
+          options:
+            - male
+            - female
+    activity:
+      default: "3"
+      selector:
+        select:
+          translation_key: activity
+          options: ["1", "2", "3", "4", "5"]
+    person:
+      selector:
+        entity:
+          domain: person

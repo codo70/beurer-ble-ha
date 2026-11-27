@@ -181,3 +181,38 @@ assert pick(70.0, {"1": 80.2, "2": 62.0}) is None          # nobody close enough
 assert pick(80.0, {"1": 79.5, "2": 81.0}) is None          # ambiguous
 assert pick(62.5, {"2": 62.0}) == "2" and pick(62.5, {}) is None
 print("guest assignment OK")
+
+# ---------------------------------------------------------------- BF700: empty scale, create user, live weight
+class EmptyScale(FakeScale):
+    """Reset scale: no users. Answers status late (busy weighing)."""
+    async def write_gatt_char(self, uuid, data, response=True):
+        d = bytes(data); self.writes.append(d)
+        if d[0] == 0xF6: self.send(bytes([0xF6, 0x00, 0x09])); return
+        if d[0] == 0xF9 or d[1] == 0xF1: return
+        cmd = d[1]
+        if cmd == 0x4F:
+            self.send(bytes([S, 0x58, 0x01, 0x02, 0x2A]), bytes([S, 0x58, 0x00, 0x06, 0x36]))  # 27.7 settling, 79.5 stable
+            asyncio.get_running_loop().call_later(0.2, self.cb, None, bytearray([S, 0xF0, 0x4F, 0, 75, 0, 0, 1, 1, 1, 1, 3]))
+        elif cmd == 0x33: self.send(bytes([S, 0xF0, 0x33, 0x00, 0, 8]))
+        elif cmd == 0x31:
+            self.added = d
+            self.send(bytes([S, 0xF0, 0x31, 0x00]))
+        elif cmd == 0x40:
+            uid = d[2:10]
+            self.send(bytes([S, 0xF0, 0x40, 0x00]))
+            r = meas_payload(1764400000, 80.3, 505, 21.9, 55.0, 38.9, 3.2)
+            self.send(bytes([S, 0x59, 3, 1, 0]) + uid, bytes([S, 0x59, 3, 2]) + r[:10], bytes([S, 0x59, 3, 3]) + r[10:])
+        elif cmd == 0x41: self.send(bytes([S, 0xF0, 0x41, 0]))
+
+async def test_create():
+    fake = EmptyScale()
+    new = proto.NewUser("cod", 1985, 3, 1, 180, True, 3)
+    s = sess.SanitasSession(fake, 0xF7, new)
+    await s.run(listen_time=0.1)
+    assert s.status.battery == 75 and s.live_weight == 79.5, (s.status, s.live_weight)
+    assert s.created_uid == 101 and s.users[101].initials == "COD"
+    assert fake.added[10:13] == b"COD" and fake.added[13:] == bytes([85, 2, 1, 180, 0x83]), fake.added.hex()
+    [m] = s.measurements[101]
+    assert m.weight_kg == 80.3 and m.fat_pct == 21.9, m
+    print("bf700 create user OK", m)
+asyncio.run(test_create())

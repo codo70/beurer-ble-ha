@@ -29,5 +29,58 @@
         }
       }
     }
+  },
+  "services": {
+    "create_scale_user": {
+      "name": "Create user on scale",
+      "description": "Creates a user on the scale at the next connection (BF700/BF710/BF800/SBF70). Then step on the scale and stay until the reference measurement is done.",
+      "fields": {
+        "config_entry": {
+          "name": "Scale",
+          "description": "The Beurer scale."
+        },
+        "initials": {
+          "name": "Initials",
+          "description": "Up to 3 letters/digits shown on the scale."
+        },
+        "birthday": {
+          "name": "Birthday",
+          "description": "Used for the body fat calculation."
+        },
+        "height": {
+          "name": "Height",
+          "description": "Body height in cm."
+        },
+        "gender": {
+          "name": "Gender",
+          "description": "Used for the body fat calculation."
+        },
+        "activity": {
+          "name": "Activity",
+          "description": "1 = hardly active … 5 = very active."
+        },
+        "person": {
+          "name": "HA person",
+          "description": "Optional: assign the readings to this person right away."
+        }
+      }
+    }
+  },
+  "selector": {
+    "gender": {
+      "options": {
+        "male": "male",
+        "female": "female"
+      }
+    },
+    "activity": {
+      "options": {
+        "1": "1 – hardly",
+        "2": "2 – little",
+        "3": "3 – moderate",
+        "4": "4 – a lot",
+        "5": "5 – very much"
+      }
+    }
   }
 }

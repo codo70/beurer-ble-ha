@@ -62,6 +62,18 @@ Under *Settings → Devices & services → Beurer BLE → Configure* every perso
 
 The device still decides who measured. Home Assistant only translates its user into an HA person, so choosing the wrong memory on the monitor still files the reading under the wrong person.
 
+## Creating a user on the scale from Home Assistant (BF700 family)
+
+After a reset the scale has no users. Call the action **`beurer_ble.create_scale_user`** (*Developer tools → Actions*) with:
+- the scale
+- initials (up to 3 characters)
+- birthday, height, gender and activity
+- optionally an HA person
+
+Then step on the scale and stay on it until the reference measurement is done. The integration creates the user at the next connection, starts the reference measurement and, if a person was given, maps the user to that HA person.
+
+Weighings without a known user (for example on an empty scale) are kept as a guest weighing.
+
 ## Consent codes (standard-profile scales only)
 
 These scales release stored data for a user only after a 4-digit consent code. The app that created the user on the scale chose that code.

@@ -104,6 +104,45 @@ def is_scale_ack(start: int, data: bytes, cmd: int) -> bool:
 
 
 @dataclass
+class NewUser:
+    """A user to create on the scale."""
+
+    initials: str
+    birth_year: int
+    birth_month: int  # 1..12
+    birth_day: int
+    height_cm: int
+    male: bool
+    activity: int  # 1..5
+
+
+def scale_initials(text: str) -> bytes:
+    """Upper-case A-Z/0-9, padded or cut to 3 bytes."""
+    clean = "".join(c for c in text.upper() if c.isascii() and c.isalnum())
+    return clean[:3].encode("ascii").ljust(3, b"\x00")
+
+
+def user_add_payload(uid: int, user: NewUser) -> bytes:
+    """Payload of CMD_USER_ADD (after start byte and command)."""
+    return uid_bytes(uid) + scale_initials(user.initials) + bytes(
+        [
+            (user.birth_year - 1900) & 0xFF,
+            (user.birth_month - 1) & 0xFF,
+            user.birth_day & 0xFF,
+            user.height_cm & 0xFF,
+            (0x80 if user.male else 0x00) | (max(1, min(5, user.activity)) & 0x0F),
+        ]
+    )
+
+
+def parse_live_weight(data: bytes) -> tuple[bool, float] | None:
+    """Parse CMD_WEIGHT_MEASUREMENT (0x58): (stable, kg)."""
+    if len(data) < 5:
+        return None
+    return data[2] == 0, _u16(data, 3) * 50 / 1000
+
+
+@dataclass
 class ScaleUser:
     """A user profile stored on the scale."""
 

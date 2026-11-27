@@ -29,7 +29,7 @@ from .const import (
 )
 from .devices import FAMILY_SANITAS, FAMILY_STANDARD, DeviceModel
 from .gatt import ScaleDisconnected
-from .sanitas_protocol import start_byte_for_name
+from .sanitas_protocol import NewUser, start_byte_for_name
 from .sanitas_session import SanitasSession
 from .standard_session import StandardSession
 
@@ -77,6 +77,9 @@ class BeurerCoordinator:
         self._last_run = 0.0
         self._unsub: CALLBACK_TYPE | None = None
         self.person_map: dict[str, str] = dict(entry.options.get(CONF_PERSONS, {}))
+        # User to create on the scale at the next connection, plus the HA person for it.
+        self.pending_user: NewUser | None = None
+        self.pending_person: str | None = None
         self.auto_assign: bool = entry.options.get(CONF_AUTO_ASSIGN, True)
 
     def ha_person(self, pid: str) -> str | None:
@@ -147,7 +150,7 @@ class BeurerCoordinator:
     def _make_session(self, client):
         tz = dt_util.get_default_time_zone()
         if self.model.family == FAMILY_SANITAS:
-            return SanitasSession(client, self._start_byte)
+            return SanitasSession(client, self._start_byte, self.pending_user)
         if self.model.family == FAMILY_STANDARD:
             consents = parse_consents(self.entry.options.get(CONF_CONSENT))
             return StandardSession(client, tz, self.model, consents)
@@ -183,16 +186,46 @@ class BeurerCoordinator:
             self._last_run = time.monotonic()
         if isinstance(session, SanitasSession):
             await self._async_process(*self._from_sanitas(session))
+            await self._async_finish_user_creation(session)
         else:
             await self._async_process(
                 session.persons, session.measurements, session.battery, session.connected_ok
             )
 
+    async def _async_finish_user_creation(self, session: SanitasSession) -> None:
+        if self.pending_user is None:
+            return
+        if session.created_uid is None:
+            _LOGGER.warning(
+                "Creating user %s on the scale did not work yet (%s); will retry at the next connection",
+                self.pending_user.initials,
+                session.create_error or "not connected long enough",
+            )
+            if session.create_error == "scale_full":
+                self.pending_user = None
+            return
+        pid = str(session.created_uid)
+        person = self.pending_person
+        self.pending_user = None
+        self.pending_person = None
+        if person:
+            persons = {**self.entry.options.get(CONF_PERSONS, {}), pid: person}
+            # Reloads the entry, so the new person gets its own device.
+            self.hass.config_entries.async_update_entry(
+                self.entry, options={**self.entry.options, CONF_PERSONS: persons}
+            )
+
     def _from_sanitas(self, session: SanitasSession):
         persons = {str(uid): u.initials for uid, u in session.users.items()}
-        measurements = {
-            str(uid): [m.as_dict() for m in lst] for uid, lst in session.measurements.items()
-        }
+        measurements: dict[str, list[dict]] = {}
+        for uid, lst in session.measurements.items():
+            pid = str(uid) if uid in session.users or str(uid) in self.persons else "guest"
+            measurements.setdefault(pid, []).extend(m.as_dict() for m in lst)
+        if session.live_weight and not any(measurements.values()):
+            # Only a weight frame (e.g. no user on the scale): keep it as a guest weighing.
+            measurements["guest"] = [{"timestamp": int(time.time()), "weight_kg": session.live_weight}]
+        if "guest" in measurements:
+            persons["guest"] = "Gast"
         battery = session.status.battery if session.status else None
         if session.status is not None:
             self._start_byte = session.start_byte
