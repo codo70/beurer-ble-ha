@@ -64,6 +64,20 @@
           "description": "Optional: assign the readings to this person right away."
         }
       }
+    },
+    "delete_scale_user": {
+      "name": "Delete user from scale",
+      "description": "Deletes a user from the scale at the next connection (BF700/BF710/BF800/SBF70). Step on the scale briefly afterwards so it connects.",
+      "fields": {
+        "config_entry": {
+          "name": "Scale",
+          "description": "The Beurer scale."
+        },
+        "user": {
+          "name": "User",
+          "description": "Initials as shown on the scale (e.g. JOH) or the user number (e.g. 102)."
+        }
+      }
     }
   },
   "selector": {

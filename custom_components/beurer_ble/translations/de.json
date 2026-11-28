@@ -64,6 +64,20 @@
           "description": "Optional: Messwerte gleich dieser Person zuordnen."
         }
       }
+    },
+    "delete_scale_user": {
+      "name": "Benutzer von Waage löschen",
+      "description": "Löscht beim nächsten Verbinden einen Benutzer von der Waage (BF700/BF710/BF800/SBF70). Danach kurz auf die Waage steigen, damit sie sich verbindet.",
+      "fields": {
+        "config_entry": {
+          "name": "Waage",
+          "description": "Die Beurer-Waage."
+        },
+        "user": {
+          "name": "Benutzer",
+          "description": "Kürzel wie auf der Waage (z. B. JOH) oder die Benutzernummer (z. B. 102)."
+        }
+      }
     }
   },
   "selector": {

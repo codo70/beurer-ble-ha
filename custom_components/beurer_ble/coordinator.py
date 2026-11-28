@@ -82,6 +82,8 @@ class BeurerCoordinator:
         # User to create on the scale at the next connection, plus the HA person for it.
         self.pending_user: NewUser | None = None
         self.pending_person: str | None = None
+        # Scale users to delete at the next connection (uid or initials).
+        self.pending_delete: set[str] = set()
         # Scale users that still need their reference measurement.
         self.needs_reference: set[int] = set()
         # Blood pressure monitors resend all stored readings every time and their
@@ -184,12 +186,19 @@ class BeurerCoordinator:
         if self.model.family == FAMILY_SANITAS:
             # Users the scale has never measured with body analysis need a reference
             # measurement first, otherwise the scale does not recognise them.
+            # Only for users that belong to an HA person: a stray user on the scale
+            # would otherwise be requested at every weighing and shown instead.
             refs = set(self.needs_reference) | {
                 int(pid)
                 for pid in self.persons
-                if pid.isdigit() and int(pid) > 0 and pid not in self._analysed
+                if pid.isdigit()
+                and int(pid) > 0
+                and pid not in self._analysed
+                and self.ha_person(pid)
             }
-            return SanitasSession(client, self._start_byte, self.pending_user, refs)
+            return SanitasSession(
+                client, self._start_byte, self.pending_user, refs, set(self.pending_delete)
+            )
         if self.model.family == FAMILY_STANDARD:
             consents = parse_consents(self.entry.options.get(CONF_CONSENT))
             return StandardSession(client, tz, self.model, consents)
@@ -241,6 +250,7 @@ class BeurerCoordinator:
             }
             self.needs_reference -= done
             self._analysed |= {str(uid) for uid in done}
+            self._finish_user_deletion(session)
             await self._async_process(*self._from_sanitas(session))
             await self._async_finish_user_creation(session)
             await self._async_save()
@@ -249,6 +259,29 @@ class BeurerCoordinator:
         else:
             await self._async_process(
                 session.persons, session.measurements, session.battery, session.connected_ok
+            )
+
+    def _finish_user_deletion(self, session: SanitasSession) -> None:
+        for key, err in session.delete_errors.items():
+            _LOGGER.warning("Deleting user %s from the scale failed: %s", key, err)
+            self.pending_delete.discard(key)
+        for uid in session.deleted_uids:
+            pid = str(uid)
+            initials = self.persons.pop(pid, None)
+            self.pending_delete -= {pid, (initials or "").upper()}
+            self.latest.pop(pid, None)
+            self.needs_reference.discard(uid)
+            self._analysed.discard(pid)
+        if session.deleted_uids and any(
+            str(uid) in self.entry.options.get(CONF_PERSONS, {}) for uid in session.deleted_uids
+        ):
+            persons = {
+                k: v
+                for k, v in self.entry.options.get(CONF_PERSONS, {}).items()
+                if k not in {str(uid) for uid in session.deleted_uids}
+            }
+            self.hass.config_entries.async_update_entry(
+                self.entry, options={**self.entry.options, CONF_PERSONS: persons}
             )
 
     async def _async_finish_user_creation(self, session: SanitasSession) -> None:

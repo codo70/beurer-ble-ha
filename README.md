@@ -105,6 +105,12 @@ Einen neuen Benutzer erkennt die Waage erst nach einer **Referenzmessung**. Sola
 
 Wiegungen ohne bekannten Benutzer, z. B. auf einer leeren Waage, werden als Gast-Wiegung gespeichert.
 
+Die Referenzmessung fordert die Integration nur für Benutzer an, die einer HA-Person zugeordnet sind (oder gerade aus HA angelegt wurden).
+
+### Benutzer von der Waage löschen
+
+Einen überflüssigen Benutzer entfernt die Aktion **„Benutzer von Waage löschen“** (`beurer_ble.delete_scale_user`) mit der Waage und dem Kürzel (z. B. `JOH`) oder der Benutzernummer (z. B. `102`). Danach kurz auf die Waage steigen, damit sie sich verbindet. Die Messwerte in HA bleiben erhalten.
+
 ## Freigabecodes (nur Standard-Waagen)
 
 Diese Waagen geben gespeicherte Daten einer Person nur nach einem vierstelligen Freigabecode heraus. Den Code hat die App festgelegt, die die Person auf der Waage angelegt hat.
@@ -233,6 +239,12 @@ The scale only recognises a new user after a **reference measurement**. Until it
 2. When the scale asks for it, step on again barefoot and stay until fat, water and muscle are shown.
 
 Weighings without a known user (for example on an empty scale) are kept as a guest weighing.
+
+The reference measurement is only requested for users that are mapped to an HA person (or were just created from HA).
+
+### Deleting a user from the scale
+
+The action **`beurer_ble.delete_scale_user`** removes a user, given the scale and the initials (e.g. `JOH`) or the user number (e.g. `102`). Step on the scale briefly afterwards so it connects. Measurements already in HA are kept.
 
 ## Consent codes (standard-profile scales only)
 

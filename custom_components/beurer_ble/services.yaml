@@ -40,3 +40,16 @@ create_scale_user:
       selector:
         entity:
           domain: person
+
+delete_scale_user:
+  fields:
+    config_entry:
+      required: true
+      selector:
+        config_entry:
+          integration: beurer_ble
+    user:
+      required: true
+      example: JOH
+      selector:
+        text:

@@ -37,19 +37,32 @@ CREATE_USER_SCHEMA = vol.Schema(
     }
 )
 
+SERVICE_DELETE_USER = "delete_scale_user"
+DELETE_USER_SCHEMA = vol.Schema(
+    {
+        vol.Required("config_entry"): cv.string,
+        vol.Required("user"): vol.All(cv.string, vol.Match(r"^[A-Za-z0-9]{1,20}$")),
+    }
+)
+
+
+def _sanitas_coordinator(hass: HomeAssistant, entry_id: str, what: str) -> BeurerCoordinator:
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None or entry.domain != DOMAIN or entry.state is not ConfigEntryState.LOADED:
+        raise ServiceValidationError("Beurer-Gerät nicht gefunden oder nicht geladen")
+    coordinator: BeurerCoordinator = entry.runtime_data
+    if coordinator.model.family != FAMILY_SANITAS:
+        raise ServiceValidationError(
+            f"Benutzer {what} geht bisher nur bei BF700/BF710/BF800/SBF70-Waagen"
+        )
+    return coordinator
+
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the services."""
 
     async def _create_user(call: ServiceCall) -> None:
-        entry = hass.config_entries.async_get_entry(call.data["config_entry"])
-        if entry is None or entry.domain != DOMAIN or entry.state is not ConfigEntryState.LOADED:
-            raise ServiceValidationError("Beurer-Gerät nicht gefunden oder nicht geladen")
-        coordinator: BeurerCoordinator = entry.runtime_data
-        if coordinator.model.family != FAMILY_SANITAS:
-            raise ServiceValidationError(
-                "Benutzer anlegen geht bisher nur bei BF700/BF710/BF800/SBF70-Waagen"
-            )
+        coordinator = _sanitas_coordinator(hass, call.data["config_entry"], "anlegen")
         birthday = call.data["birthday"]
         coordinator.pending_user = NewUser(
             initials=call.data["initials"].upper(),
@@ -63,6 +76,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         coordinator.pending_person = call.data.get("person")
 
     hass.services.async_register(DOMAIN, SERVICE_CREATE_USER, _create_user, CREATE_USER_SCHEMA)
+
+    async def _delete_user(call: ServiceCall) -> None:
+        coordinator = _sanitas_coordinator(hass, call.data["config_entry"], "löschen")
+        coordinator.pending_delete.add(call.data["user"].strip().upper())
+
+    hass.services.async_register(DOMAIN, SERVICE_DELETE_USER, _delete_user, DELETE_USER_SCHEMA)
     return True
 
 

@@ -20,6 +20,7 @@ from .sanitas_protocol import (
     CMD_USER_INFO,
     CMD_DO_MEASUREMENT,
     CMD_USER_ADD,
+    CMD_USER_DELETE,
     CMD_USER_LIST,
     CMD_WEIGHT_MEASUREMENT,
     NIBBLE_INIT,
@@ -64,9 +65,15 @@ class SanitasSession:
         start_byte: int,
         new_user: NewUser | None = None,
         reference_uids: set[int] | None = None,
+        delete_users: set[str] | None = None,
     ) -> None:
         """Initialise."""
         self._new_user = new_user
+        # Scale users to delete, given as uid ("102") or initials ("JOH").
+        self._delete_users = {str(u).strip().upper() for u in (delete_users or ())}
+        self.deleted_uids: set[int] = set()
+        # Delete requests that could not be resolved or were refused (not retried).
+        self.delete_errors: dict[str, str] = {}
         self._reference_uids = set(reference_uids or ())
         self.created_uid: int | None = None
         self.create_error: str | None = None
@@ -237,6 +244,41 @@ class SanitasSession:
         _LOGGER.info("Created user %s on the scale (uid %s)", user.initials, uid)
         self._reference_uids.add(uid)
 
+    async def _list_users(self) -> None:
+        self.users = {}
+        await self._write(cmd_frame(self._start, CMD_USER_LIST))
+        ack = await self._wait_ack(CMD_USER_LIST, STATUS_TIMEOUT)
+        count = ack[4] if len(ack) > 4 else 0
+        if count:
+            await self._wait_until(lambda: len(self.users) >= count, DATA_TIMEOUT)
+
+    async def _delete_requested_users(self) -> None:
+        """Delete the requested users from the scale, then re-read the user list."""
+        targets: set[int] = set()
+        for key in self._delete_users:
+            matches = [
+                uid for uid, u in self.users.items() if key in (str(uid), u.initials.upper())
+            ]
+            if len(matches) != 1:
+                self.delete_errors[key] = "not_found" if not matches else "ambiguous"
+                continue
+            targets.add(matches[0])
+        for uid in sorted(targets):
+            await self._write(cmd_frame(self._start, CMD_USER_DELETE, uid_bytes(uid)))
+            try:
+                ack = await self._wait_ack(CMD_USER_DELETE, STATUS_TIMEOUT)
+            except TimeoutError:
+                _LOGGER.debug("No answer to deleting uid %s", uid)
+                continue
+            if len(ack) > 3 and ack[3] != 0:
+                _LOGGER.warning("Scale refused to delete user uid %s (status %s)", uid, ack[3])
+                self.delete_errors[str(uid)] = "refused"
+        if targets:
+            await self._list_users()
+            self.deleted_uids = {uid for uid in targets if uid not in self.users}
+            for uid in self.deleted_uids:
+                _LOGGER.info("Deleted user uid %s from the scale", uid)
+
     async def _reference(self, uid: int) -> None:
         """Ask the scale to measure this user (reference measurement).
 
@@ -274,13 +316,11 @@ class SanitasSession:
         await self._write(set_time_frame(self._start, int(time.time())))
         await self._status()
 
-        await self._write(cmd_frame(self._start, CMD_USER_LIST))
-        ack = await self._wait_ack(CMD_USER_LIST, STATUS_TIMEOUT)
-        count = ack[4] if len(ack) > 4 else 0
-        if count:
-            await self._wait_until(lambda: len(self.users) >= count, DATA_TIMEOUT)
+        await self._list_users()
         _LOGGER.debug("Scale users: %s", list(self.users.values()))
 
+        if self._delete_users:
+            await self._delete_requested_users()
         if self._new_user is not None:
             await self._create_user(self._new_user)
         for uid in sorted(self._reference_uids):

@@ -239,3 +239,46 @@ assert u == 2 and v["systolic"] == 115 and v["pulse"] == 64 and v["status_raw"] 
 u, ts, v = bpm.parse_bp_measurement(bytes.fromhex("56870 05e00000020 08041b0e310000510000 04".replace(" ", "")), timezone.utc)
 assert u == 1 and v["irregular_pulse"] is True and v["status_raw"] == 4, (u, v)
 print("real BM85 frame OK")
+
+# ---------------------------------------------------------------- delete a scale user
+class FakeScaleTwoUsers(FakeScale):
+    """Two users (COD 101, JOH 102); supports CMD_USER_DELETE (0x32)."""
+    def __init__(self):
+        super().__init__(); self.users={101:b"COD",102:b"JOH"}
+    async def write_gatt_char(self, uuid, data, response=True):
+        d=bytes(data)
+        if len(d)>1 and d[0]==S and d[1]==0x33:
+            self.writes.append(d)
+            self.send(bytes([S,0xF0,0x33,0x00,len(self.users),8]))
+            for i,(uid,name) in enumerate(sorted(self.users.items())):
+                self.send(bytes([S,0x34,len(self.users),i+1])+struct.pack(">Q",uid)+name+bytes([70]))
+            return
+        if len(d)>1 and d[0]==S and d[1]==0x32:
+            self.writes.append(d)
+            uid=struct.unpack(">Q",d[2:10])[0]
+            ok=self.users.pop(uid,None) is not None
+            self.send(bytes([S,0xF0,0x32,0 if ok else 1])); return
+        if len(d)>1 and d[0]==S and d[1]==0x41:
+            self.writes.append(d); self.send(bytes([S,0xF0,0x41,0])); return
+        await super().write_gatt_char(uuid, data, response)
+
+async def delete_test():
+    fake=FakeScaleTwoUsers()
+    s=sess.SanitasSession(fake, 0xF7, delete_users={"joh", "XYZ"})
+    await s.run(listen_time=0)
+    assert s.deleted_uids=={102}, s.deleted_uids
+    assert set(s.users)=={101}, s.users
+    assert s.delete_errors=={"XYZ":"not_found"}, s.delete_errors
+    dels=[w for w in fake.writes if len(w)>1 and w[1]==0x32]
+    assert dels==[bytes([S,0x32])+struct.pack(">Q",102)], dels
+    # by number, and nothing deleted without a request
+    fake=FakeScaleTwoUsers()
+    s=sess.SanitasSession(fake, 0xF7, delete_users={"101"})
+    await s.run(listen_time=0)
+    assert s.deleted_uids=={101} and set(fake.users)=={102}
+    fake=FakeScaleTwoUsers()
+    s=sess.SanitasSession(fake, 0xF7)
+    await s.run(listen_time=0)
+    assert not any(len(w)>1 and w[1]==0x32 for w in fake.writes) and len(s.users)==2
+    print("delete user OK")
+asyncio.run(delete_test())
